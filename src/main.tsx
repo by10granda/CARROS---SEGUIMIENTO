@@ -294,12 +294,50 @@ function labelFor(key: string) {
 }
 
 function ExportButtons({ records, title, filters, service }: { records: VehicleRecord[]; title: string; filters: Filters; service?: ServiceName }) {
-  function rows() {
-    return records.map((record) => ({ Fecha: record.fecha, Servicio: record.tipoServicio, Placa: record.placa, Chofer: record.chofer, Taller: record.taller, Lugar: record.lugar, Maestro: record.maestro, Pago: record.cantidadPago, Descripcion: record.descripcion }));
-  }
   function excel() {
-    const ws = XLSX.utils.json_to_sheet(rows());
-    XLSX.utils.sheet_add_aoa(ws, [[`Distribuidor Punto PAS - ${title}`], [`Generado: ${new Date().toLocaleString('es-DO')}`], [`Filtros: placa ${filters.placa || 'Todas'}, desde ${filters.desde || 'inicio'}, hasta ${filters.hasta || 'actual'}, servicio ${service || 'Todos'}`], []], { origin: 'A1' });
+    const header = ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
+    const body = records.map((record, index) => [
+      record.item || String(index + 1),
+      record.fecha,
+      record.tipoServicio,
+      record.lugar,
+      record.maestro,
+      record.taller,
+      record.chofer,
+      record.placa,
+      record.cantidadPago,
+      record.descripcion,
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['DISTRIBUIDOR PUNTO PAS'],
+      [title],
+      [`Fecha de generacion: ${new Date().toLocaleString('es-DO')}`],
+      [`Filtros aplicados: Placa ${filters.placa || 'Todas'} | Desde ${filters.desde || 'Inicio'} | Hasta ${filters.hasta || 'Actual'} | Servicio ${service || 'Todos'}`],
+      [],
+      header,
+      ...body,
+      [],
+      ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
+    ]);
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: 9 } },
+    ];
+    ws['!cols'] = [
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 45 },
+    ];
+    ws['!autofilter'] = { ref: `A6:J${Math.max(6, body.length + 6)}` };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
     XLSX.writeFile(wb, `${title.replace(/\s+/g, '_')}.xlsx`);
