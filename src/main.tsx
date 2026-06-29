@@ -15,10 +15,12 @@ import {
   FilterX,
   Gauge,
   LogOut,
+  Moon,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
+  Sun,
   Wrench,
   X,
 } from 'lucide-react';
@@ -351,10 +353,10 @@ function Field({ label, value, onChange, type = 'text' }: { label: string; value
   return <label>{label}<input required type={type} value={value} onChange={(e) => onChange(e.target.value)} /></label>;
 }
 
-function ModuleView({ service, records, filters, setFilters, onBack, onAdd }: { service: ServiceName; records: VehicleRecord[]; filters: Filters; setFilters: (filters: Filters) => void; onBack: () => void; onAdd: () => void }) {
+function ModuleView({ service, records, filters, setFilters, onBack, onAdd, nightMode, onToggleNight }: { service: ServiceName; records: VehicleRecord[]; filters: Filters; setFilters: (filters: Filters) => void; onBack: () => void; onAdd: () => void; nightMode: boolean; onToggleNight: () => void }) {
   const filtered = applyFilters(records.filter((r) => r.tipoServicio === service), filters);
   const Icon = serviceMeta[service].icon;
-  return <><header className="topbar"><Logo /><div className="top-actions"><button className="ghost" onClick={onBack}><ChevronLeft size={16} /> Dashboard</button></div></header><main className="page"><section className="hero compact"><div><span className="eyebrow"><Icon size={16} /> Modulo individual</span><h1>{service}</h1><p>Consulta, ordena, filtra, exporta y registra servicios de {service.toLowerCase()}.</p></div><button className="primary" onClick={onAdd}><Plus size={18} /> Agregar registro</button></section><FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><DataTable records={filtered} title={`Reporte de ${service}`} filters={filters} service={service} /></main><button className="fab" onClick={onAdd}><Plus /></button></>;
+  return <><header className="topbar"><Logo /><div className="top-actions"><button className="ghost" onClick={onToggleNight}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={onBack}><ChevronLeft size={16} /> Dashboard</button></div></header><main className="page"><section className="hero compact"><div><span className="eyebrow"><Icon size={16} /> Modulo individual</span><h1>{service}</h1><p>Consulta, ordena, filtra, exporta y registra servicios de {service.toLowerCase()}.</p></div><button className="primary" onClick={onAdd}><Plus size={18} /> Agregar registro</button></section><FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><DataTable records={filtered} title={`Reporte de ${service}`} filters={filters} service={service} /></main><button className="fab" onClick={onAdd}><Plus /></button></>;
 }
 
 function Dashboard() {
@@ -364,13 +366,19 @@ function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
+  const [nightMode, setNightMode] = useState(localStorage.getItem('punto-pas-theme') === 'night');
+
+  useEffect(() => {
+    document.body.classList.toggle('night-mode', nightMode);
+    localStorage.setItem('punto-pas-theme', nightMode ? 'night' : 'day');
+  }, [nightMode]);
 
   useEffect(() => {
     Promise.all(SERVICES.map(fetchSheet)).then((results) => setRecords(results.flat())).catch(() => { setRecords(mockData); setNotice('No se pudo leer Google Sheets. Se muestran datos de demostracion hasta publicar/compartir correctamente el archivo.'); }).finally(() => setLoading(false));
   }, []);
 
   if (activeService) {
-    return <><ModuleView service={activeService} records={records} filters={filters} setFilters={setFilters} onBack={() => setActiveService(null)} onAdd={() => setModalOpen(true)} /><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /></>;
+    return <><ModuleView service={activeService} records={records} filters={filters} setFilters={setFilters} onBack={() => setActiveService(null)} onAdd={() => setModalOpen(true)} nightMode={nightMode} onToggleNight={() => setNightMode((value) => !value)} /><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /></>;
   }
 
   const filtered = applyFilters(records, filters);
@@ -381,7 +389,7 @@ function Dashboard() {
 
   function logout() { sessionStorage.removeItem('punto-pas-session'); window.location.reload(); }
 
-  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>Gestion de mantenimientos vehiculares</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
+  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>Gestion de mantenimientos vehiculares</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
 }
 
 function App() {
