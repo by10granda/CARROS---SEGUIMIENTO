@@ -51,9 +51,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .login-form { align-self: center; padding: 28px; border-radius: 26px; background: #fff; border: 1px solid var(--line); box-shadow: 0 16px 45px rgba(15,23,42,.08); }
 
 .logo { display: flex; align-items: center; gap: 14px; }
-.logo-mark { width: 54px; height: 54px; display: grid; place-items: center; color: #fff; border-radius: 18px; font-weight: 950; box-shadow: 0 12px 28px rgba(255,0,0,.28); background: linear-gradient(135deg, var(--red) 0 50%, var(--green) 50% 100%); }
-.logo-mark span:first-child { color: #fff; }
-.logo-mark span:last-child { margin-left: -2px; color: #080b10; }
+.logo-image { width: 58px; height: 58px; object-fit: cover; border-radius: 18px; box-shadow: 0 12px 28px rgba(255,0,0,.26); background: var(--red); }
 .logo strong { display: block; font-size: 1rem; letter-spacing: -.02em; }
 .logo small { display: block; color: var(--muted); margin-top: 2px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--red); font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: .76rem; }
@@ -102,11 +100,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--red); box-shadow
   align-items: center;
   gap: 18px;
   padding: 18px clamp(16px, 4vw, 48px);
-  background: rgba(255,255,255,.86);
-  border-bottom: 1px solid var(--line);
+  color: #fff;
+  background: linear-gradient(135deg, #ff0000, #c90000);
+  border-bottom: 1px solid rgba(255,255,255,.18);
   backdrop-filter: blur(18px);
+  box-shadow: 0 14px 38px rgba(255,0,0,.24);
 }
-.top-meta, .top-actions { display: flex; align-items: center; gap: 12px; color: var(--muted); font-weight: 700; flex-wrap: wrap; justify-content: flex-end; }
+.topbar .logo small, .top-meta, .top-actions { color: rgba(255,255,255,.82); }
+.topbar .logo-image { border: 2px solid rgba(255,255,255,.85); box-shadow: 0 10px 28px rgba(0,0,0,.22); }
+.topbar .ghost { color: #fff; background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.24); }
+.top-meta, .top-actions { display: flex; align-items: center; gap: 12px; font-weight: 700; flex-wrap: wrap; justify-content: flex-end; }
 .page { padding: 28px clamp(16px, 4vw, 48px) 90px; }
 .hero {
   display: flex;

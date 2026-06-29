@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 900" role="img" aria-label="Punto PAS">
+  <rect width="900" height="900" fill="#ff0000"/>
+  <path d="M450 130c-91 0-165 74-165 165 0 47 19 89 51 119l113 116 78-78-60-61c82-9 146-79 146-164 0-91-73-97-163-97z" fill="#fff" opacity=".98"/>
+  <circle cx="450" cy="290" r="88" fill="#fff" stroke="#25b34b" stroke-width="10"/>
+  <circle cx="450" cy="290" r="106" fill="none" stroke="#ff0000" stroke-width="16"/>
+  <path d="M374 279h152v55H374z" fill="#fff" stroke="#25b34b" stroke-width="5"/>
+  <path d="M390 271l60-50 60 50" fill="none" stroke="#25b34b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M420 252v-30h24v11m22 0v40" fill="none" stroke="#25b34b" stroke-width="7" stroke-linecap="round"/>
+  <path d="M398 305h104" stroke="#ff0000" stroke-width="9" stroke-linecap="round"/>
+  <text x="450" y="300" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="30" font-weight="900" fill="#ff0000">PUNTO PAS</text>
+  <text x="450" y="328" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="18" font-weight="900" fill="#111827">PETMEMEBASPS</text>
+  <text x="450" y="640" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="92" font-weight="900" fill="#fff">PUNTO PAS</text>
+  <text x="450" y="690" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#fff">ENCUENTRA TODO EN UN SOLO LUGAR</text>
+  <rect x="190" y="705" width="520" height="16" fill="#25ff00"/>
+  <text x="450" y="785" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="58" font-style="italic" font-weight="900" fill="#fff">PETMEMEBASPS</text>
+</svg>
