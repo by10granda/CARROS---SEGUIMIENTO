@@ -101,7 +101,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--red); box-shadow
   gap: 18px;
   padding: 18px clamp(16px, 4vw, 48px);
   color: #fff;
-  background: linear-gradient(135deg, #ff0000, #c90000);
+  background: #ff0000;
   border-bottom: 1px solid rgba(255,255,255,.18);
   backdrop-filter: blur(18px);
   box-shadow: 0 14px 38px rgba(255,0,0,.24);
