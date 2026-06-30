@@ -370,8 +370,12 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
   const [form, setForm] = useState<FormState>(emptyForm);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setConfirming(true);
+  }
+  async function confirmSave() {
     setSaving(true); setStatus('');
     try {
       await addRecord(form);
@@ -379,12 +383,13 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
       onSaved(record);
       setStatus('Registro guardado correctamente.');
       setForm(emptyForm);
+      setConfirming(false);
       setTimeout(onClose, 700);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'No se pudo guardar el registro.');
     } finally { setSaving(false); }
   }
-  return <AnimatePresence>{open && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.form className="modal" onSubmit={submit} initial={{ scale: .96, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 20 }}><div className="modal-head"><div><span className="eyebrow"><Plus size={14} /> Nuevo registro</span><h2>Agregar servicio vehicular</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={20} /></button></div><div className="form-grid"><Field label="Fecha" type="date" value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /><Field label="Lugar" value={form.lugar} onChange={(v) => setForm({ ...form, lugar: v })} /><Field label="Maestro" value={form.maestro} onChange={(v) => setForm({ ...form, maestro: v })} /><Field label="Taller" value={form.taller} onChange={(v) => setForm({ ...form, taller: v })} /><Field label="Chofer" value={form.chofer} onChange={(v) => setForm({ ...form, chofer: v })} /><Field label="Placa" value={form.placa} onChange={(v) => setForm({ ...form, placa: v.toUpperCase() })} /><Field label="Cantidad de pago" type="number" value={form.cantidadPago} onChange={(v) => setForm({ ...form, cantidadPago: v })} /><label>Tipo de servicio<select value={form.tipoServicio} onChange={(e) => setForm({ ...form, tipoServicio: e.target.value as ServiceName })}>{SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><label className="span-2">Descripcion<textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required /></label></div>{status && <div className={`alert ${status.includes('correctamente') ? 'success' : 'error'}`}>{status}</div>}<button className="primary full" disabled={saving}>{saving ? 'Guardando...' : 'Guardar en Google Sheets'}</button></motion.form></motion.div>}</AnimatePresence>;
+  return <AnimatePresence>{open && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.form className="modal" onSubmit={submit} initial={{ scale: .96, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 20 }}><div className="modal-head"><div><span className="eyebrow"><Plus size={14} /> Nuevo registro</span><h2>Agregar servicio vehicular</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={20} /></button></div><div className="form-grid"><Field label="Fecha" type="date" value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /><Field label="Lugar" value={form.lugar} onChange={(v) => setForm({ ...form, lugar: v })} /><Field label="Maestro" value={form.maestro} onChange={(v) => setForm({ ...form, maestro: v })} /><Field label="Taller" value={form.taller} onChange={(v) => setForm({ ...form, taller: v })} /><Field label="Chofer" value={form.chofer} onChange={(v) => setForm({ ...form, chofer: v })} /><Field label="Placa" value={form.placa} onChange={(v) => setForm({ ...form, placa: v.toUpperCase() })} /><Field label="Cantidad de pago" type="number" value={form.cantidadPago} onChange={(v) => setForm({ ...form, cantidadPago: v })} /><label>Tipo de servicio<select value={form.tipoServicio} onChange={(e) => setForm({ ...form, tipoServicio: e.target.value as ServiceName })}>{SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><label className="span-2">Descripcion<textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required /></label></div>{status && <div className={`alert ${status.includes('correctamente') ? 'success' : 'error'}`}>{status}</div>}<button className="primary full" disabled={saving}>{saving ? 'Guardando...' : 'Guardar en Google Sheets'}</button>{confirming && <div className="confirm-box"><strong>Estas seguro en guardar?</strong><p>Revisa que la placa, fecha, servicio y monto esten correctos antes de enviar el registro.</p><div className="confirm-actions"><button type="button" className="primary" disabled={saving} onClick={confirmSave}>Si</button><button type="button" className="secondary" disabled={saving} onClick={() => setConfirming(false)}>No</button></div></div>}</motion.form></motion.div>}</AnimatePresence>;
 }
 
 function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {

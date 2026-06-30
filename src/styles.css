@@ -266,6 +266,22 @@ body.night-mode .modal { color: #f8fafc; background: #0b1220; border: 1px solid 
 body.night-mode .icon-btn { color: #f8fafc; background: rgba(255,255,255,.08); }
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .span-2 { grid-column: span 2; }
+.confirm-box {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #fecaca;
+  background: #fff1f1;
+  color: #7f1d1d;
+}
+.confirm-box strong { display: block; font-size: 1.05rem; }
+.confirm-box p { margin: 8px 0 14px; line-height: 1.5; }
+.confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+body.night-mode .confirm-box {
+  color: #fee2e2;
+  background: rgba(127,29,29,.28);
+  border-color: rgba(248,113,113,.35);
+}
 
 @media (max-width: 1180px) {
   .summary-grid, .service-grid { grid-template-columns: repeat(2, 1fr); }
