@@ -42,6 +42,22 @@ La app usa estas pestañas del mismo archivo:
 - Lavado: `gid=819388144`
 - Engrasada: `gid=2024356449`
 - Cambio de aceite: `gid=464443967`
+- Control horometro: pestaña `CONTROL HOROMETRO`
+
+## Control horometro
+
+El modulo `Control horometro` usa columnas propias:
+
+`ITEM, FECHA, LUGAR, CHOFER, HOROMETRO ANTERIOR, HOROMETRO ACTUAL, HORAS TRABAJADAS, PLACA, CAMBIO DE ACEITE?, DESCRIPCION`
+
+Si `CAMBIO DE ACEITE?` es `NO`, la app acumula las horas por placa. Cuando una placa llega a `250` horas o mas sin cambio de aceite, muestra una alerta con enlaces de WhatsApp para:
+
+- `+593 93 906 9555`
+- `+593 99 788 2191`
+
+Para envio 100% automatico por WhatsApp se debe conectar una API oficial de WhatsApp Business o Twilio con credenciales del negocio. Una web estatica no puede enviar mensajes automaticos de WhatsApp sin esa autorizacion externa.
+
+Despues de modificar `apps-script/Code.gs`, publica una nueva version del Web App en Apps Script para que Google Sheets reciba tambien los registros de horometro.
 
 11. Reinicia la app con `npm run dev`.
 

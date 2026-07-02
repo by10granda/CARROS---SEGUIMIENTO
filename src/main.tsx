@@ -15,6 +15,7 @@ import {
   FilterX,
   Gauge,
   LogOut,
+  MessageCircle,
   Moon,
   Plus,
   Search,
@@ -43,7 +44,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import './styles.css';
 
-type ServiceName = 'Mantenimiento' | 'Lavado' | 'Engrasada' | 'Cambio de aceite';
+type ServiceName = 'Mantenimiento' | 'Lavado' | 'Engrasada' | 'Cambio de aceite' | 'Control horometro';
 
 type VehicleRecord = {
   item: string;
@@ -56,6 +57,10 @@ type VehicleRecord = {
   cantidadPago: number;
   descripcion: string;
   tipoServicio: ServiceName;
+  horometroAnterior?: number;
+  horometroActual?: number;
+  horasTrabajadas?: number;
+  cambioAceite?: 'SI' | 'NO' | '';
 };
 
 type Filters = {
@@ -69,14 +74,15 @@ type FormState = Omit<VehicleRecord, 'item' | 'cantidadPago'> & { cantidadPago: 
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID || '1Evr1lpNSwLYXWgcRf5D5NSPUD5nR-YS_EczVK4PVAHI';
 const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
 
-const SERVICES: ServiceName[] = ['Mantenimiento', 'Lavado', 'Engrasada', 'Cambio de aceite'];
-const COLORS = ['#ff0000', '#25ff00', '#111827', '#9ca3af'];
+const SERVICES: ServiceName[] = ['Mantenimiento', 'Lavado', 'Engrasada', 'Cambio de aceite', 'Control horometro'];
+const COLORS = ['#ff0000', '#25ff00', '#111827', '#9ca3af', '#f59e0b'];
 const HEADERS = ['ITEM', 'FECHA', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
 const SHEET_GIDS: Record<ServiceName, string> = {
   Mantenimiento: '0',
   Lavado: '819388144',
   Engrasada: '2024356449',
   'Cambio de aceite': '464443967',
+  'Control horometro': '',
 };
 
 const serviceMeta: Record<ServiceName, { icon: React.ElementType; accent: string; description: string }> = {
@@ -84,6 +90,7 @@ const serviceMeta: Record<ServiceName, { icon: React.ElementType; accent: string
   Lavado: { icon: Droplets, accent: 'green', description: 'Control de limpiezas vehiculares' },
   Engrasada: { icon: Gauge, accent: 'dark', description: 'Lubricacion y proteccion mecanica' },
   'Cambio de aceite': { icon: Bike, accent: 'gray', description: 'Registros de aceite y filtros' },
+  'Control horometro': { icon: Gauge, accent: 'orange', description: 'Horas acumuladas y alertas de aceite' },
 };
 
 const mockData: VehicleRecord[] = [
@@ -91,6 +98,7 @@ const mockData: VehicleRecord[] = [
   { item: '2', fecha: '2026-06-05', lugar: 'La Vega', maestro: 'Ramon Cruz', taller: 'PAS Norte', chofer: 'Ana Gomez', placa: 'PAS-220', cantidadPago: 850, descripcion: 'Lavado completo', tipoServicio: 'Lavado' },
   { item: '3', fecha: '2026-06-08', lugar: 'Santiago', maestro: 'Miguel Soto', taller: 'LubriExpress', chofer: 'Jose Rivas', placa: 'PAS-104', cantidadPago: 1450, descripcion: 'Engrasada tren delantero', tipoServicio: 'Engrasada' },
   { item: '4', fecha: '2026-06-12', lugar: 'Distrito Nacional', maestro: 'Pedro Leon', taller: 'AutoServicio PAS', chofer: 'Marta Gil', placa: 'PAS-308', cantidadPago: 3650, descripcion: 'Cambio aceite 15W40', tipoServicio: 'Cambio de aceite' },
+  { item: '5', fecha: '2026-06-15', lugar: '', maestro: '', taller: '', chofer: 'Luis Perez', placa: 'PAS-104', cantidadPago: 0, descripcion: 'Jornada de maquinaria', tipoServicio: 'Control horometro', horometroAnterior: 1000, horometroActual: 1120, horasTrabajadas: 120, cambioAceite: 'NO' },
 ];
 
 const emptyFilters: Filters = { placa: '', desde: '', hasta: '' };
@@ -104,6 +112,10 @@ const emptyForm: FormState = {
   cantidadPago: '',
   descripcion: '',
   tipoServicio: 'Mantenimiento',
+  horometroAnterior: 0,
+  horometroActual: 0,
+  horasTrabajadas: 0,
+  cambioAceite: 'NO',
 };
 
 function money(value: number) {
@@ -129,11 +141,35 @@ function parseGviz(text: string): unknown[][] {
 }
 
 async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GIDS[service]}`;
+  const source = SHEET_GIDS[service] ? `gid=${SHEET_GIDS[service]}` : `sheet=${encodeURIComponent('CONTROL HOROMETRO')}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&${source}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`No se pudo consultar ${service}`);
   const rows = parseGviz(await response.text());
   const dataRows = rows.filter((row) => String(row[0]).toUpperCase() !== 'ITEM' && row.some(Boolean));
+  if (service === 'Control horometro') {
+    return dataRows.map((row) => {
+      const anterior = parseNumber(row[4]);
+      const actual = parseNumber(row[5]);
+      const horas = parseNumber(row[6]) || Math.max(0, actual - anterior);
+      return {
+        item: String(row[0] ?? ''),
+        fecha: normalizeDate(String(row[1] ?? '')),
+        lugar: String(row[2] ?? ''),
+        maestro: '',
+        taller: '',
+        chofer: String(row[3] ?? ''),
+        placa: String(row[7] ?? '').toUpperCase(),
+        cantidadPago: 0,
+        descripcion: String(row[9] ?? ''),
+        tipoServicio: service,
+        horometroAnterior: anterior,
+        horometroActual: actual,
+        horasTrabajadas: horas,
+        cambioAceite: String(row[8] ?? '').toUpperCase() === 'SI' ? 'SI' : 'NO',
+      };
+    });
+  }
   return dataRows.map((row) => ({
     item: String(row[0] ?? ''),
     fecha: normalizeDate(String(row[1] ?? '')),
@@ -234,13 +270,14 @@ function ServiceCard({ service, records, onOpen }: { service: ServiceName; recor
   const meta = serviceMeta[service];
   const Icon = meta.icon;
   const total = records.reduce((sum, record) => sum + record.cantidadPago, 0);
+  const totalHours = records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0);
   const last = [...records].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   return (
     <motion.article whileHover={{ y: -5 }} className={`service-card ${meta.accent}`}>
       <div className="service-head"><div className="service-icon"><Icon size={28} /></div><span>{records.length} registros</span></div>
       <h3>{service.toUpperCase()}</h3>
       <p>{meta.description}</p>
-      <div className="service-stats"><strong>{money(total)}</strong><small>Ultimo: {last ? `${last.fecha} - ${last.placa}` : 'Sin registros'}</small></div>
+      <div className="service-stats"><strong>{service === 'Control horometro' ? `${totalHours} horas` : money(total)}</strong><small>Ultimo: {last ? `${last.fecha} - ${last.placa}` : 'Sin registros'}</small></div>
       <button className="secondary" onClick={onOpen}>Ingresar al modulo</button>
     </motion.article>
   );
@@ -260,6 +297,8 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const visible = sorted.slice((page - 1) * pageSize, page * pageSize);
   const total = records.reduce((sum, record) => sum + record.cantidadPago, 0);
+  const isHourMeter = service === 'Control horometro';
+  const tableKeys = isHourMeter ? ['fecha', 'placa', 'chofer', 'lugar', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
 
   useEffect(() => setPage(1), [records.length]);
 
@@ -270,17 +309,17 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
 
   return (
     <section className="table-card">
-      <div className="table-toolbar"><div><h2>{title}</h2><p>{records.length} registros filtrados · Total {money(total)}</p></div><ExportButtons records={records} title={title} filters={filters} service={service} /></div>
+      <div className="table-toolbar"><div><h2>{title}</h2><p>{records.length} registros filtrados · {isHourMeter ? `${records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0)} horas acumuladas` : `Total ${money(total)}`}</p></div><ExportButtons records={records} title={title} filters={filters} service={service} /></div>
       <div className="table-wrap">
         <table>
-          <thead><tr>{['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'].map((key) => <th key={key} onClick={() => setSort(key as keyof VehicleRecord)}>{labelFor(key)} {sortKey === key ? (direction === 'asc' ? '↑' : '↓') : ''}</th>)}</tr></thead>
+          <thead><tr>{tableKeys.map((key) => <th key={key} onClick={() => setSort(key as keyof VehicleRecord)}>{labelFor(key)} {sortKey === key ? (direction === 'asc' ? '↑' : '↓') : ''}</th>)}</tr></thead>
           <tbody>
             {visible.map((record, index) => (
               <tr key={`${record.tipoServicio}-${record.item}-${index}`}>
-                <td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td>
+                {isHourMeter ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Horometro anterior">{record.horometroAnterior || 0}</td><td data-label="Horometro actual">{record.horometroActual || 0}</td><td data-label="Horas trabajadas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
               </tr>
             ))}
-            {!visible.length && <tr><td colSpan={8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
+            {!visible.length && <tr><td colSpan={isHourMeter ? 9 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -290,13 +329,25 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
 }
 
 function labelFor(key: string) {
-  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion' } as Record<string, string>)[key] || key;
+  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', horometroAnterior: 'Horometro anterior', horometroActual: 'Horometro actual', horasTrabajadas: 'Horas trabajadas', cambioAceite: 'Cambio aceite?' } as Record<string, string>)[key] || key;
 }
 
 function ExportButtons({ records, title, filters, service }: { records: VehicleRecord[]; title: string; filters: Filters; service?: ServiceName }) {
   function excel() {
-    const header = ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
-    const body = records.map((record, index) => [
+    const isHourMeter = service === 'Control horometro';
+    const header = isHourMeter ? ['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'HOROMETRO ANTERIOR', 'HOROMETRO ACTUAL', 'HORAS TRABAJADAS', 'PLACA', 'CAMBIO DE ACEITE?', 'DESCRIPCION'] : ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
+    const body = records.map((record, index) => isHourMeter ? [
+      record.item || String(index + 1),
+      record.fecha,
+      record.lugar,
+      record.chofer,
+      record.horometroAnterior || 0,
+      record.horometroActual || 0,
+      record.horasTrabajadas || 0,
+      record.placa,
+      record.cambioAceite || 'NO',
+      record.descripcion,
+    ] : [
       record.item || String(index + 1),
       record.fecha,
       record.tipoServicio,
@@ -317,7 +368,7 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       header,
       ...body,
       [],
-      ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
+      isHourMeter ? ['', '', '', '', '', 'TOTAL HORAS', records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0), '', '', ''] : ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
     ]);
     ws['!merges'] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
@@ -343,13 +394,14 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
     XLSX.writeFile(wb, `${title.replace(/\s+/g, '_')}.xlsx`);
   }
   function pdf() {
+    const isHourMeter = service === 'Control horometro';
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFillColor(255, 0, 0); doc.rect(10, 10, 12, 12, 'F');
     doc.setFillColor(37, 255, 0); doc.rect(22, 10, 12, 12, 'F');
     doc.setFontSize(16); doc.text('Distribuidor Punto PAS', 40, 16);
     doc.setFontSize(11); doc.text(title, 40, 23);
     doc.text(`Generado: ${new Date().toLocaleString('es-DO')} | Placa: ${filters.placa || 'Todas'} | Servicio: ${service || 'Todos'}`, 10, 34);
-    autoTable(doc, { startY: 40, head: [['Fecha', 'Servicio', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Pago', 'Descripcion']], body: records.map((r) => [r.fecha, r.tipoServicio, r.placa, r.chofer, r.taller, r.lugar, money(r.cantidadPago), r.descripcion]), styles: { fontSize: 8 }, headStyles: { fillColor: [255, 0, 0] } });
+    autoTable(doc, { startY: 40, head: [isHourMeter ? ['Fecha', 'Placa', 'Chofer', 'Lugar', 'Anterior', 'Actual', 'Horas', 'Cambio aceite', 'Descripcion'] : ['Fecha', 'Servicio', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Pago', 'Descripcion']], body: isHourMeter ? records.map((r) => [r.fecha, r.placa, r.chofer, r.lugar, r.horometroAnterior || 0, r.horometroActual || 0, r.horasTrabajadas || 0, r.cambioAceite || 'NO', r.descripcion]) : records.map((r) => [r.fecha, r.tipoServicio, r.placa, r.chofer, r.taller, r.lugar, money(r.cantidadPago), r.descripcion]), styles: { fontSize: 8 }, headStyles: { fillColor: [255, 0, 0] } });
     doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
   }
   return <div className="export-actions"><button className="secondary" onClick={excel}><FileSpreadsheet size={16} /> Excel</button><button className="secondary" onClick={pdf}><FileText size={16} /> PDF</button></div>;
@@ -371,6 +423,8 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const isHourMeter = form.tipoServicio === 'Control horometro';
+  const calculatedHours = Math.max(0, Number(form.horometroActual || 0) - Number(form.horometroAnterior || 0));
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setConfirming(true);
@@ -378,8 +432,9 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
   async function confirmSave() {
     setSaving(true); setStatus('');
     try {
-      await addRecord(form);
-      const record: VehicleRecord = { ...form, item: String(Date.now()), cantidadPago: Number(form.cantidadPago) || 0, placa: form.placa.toUpperCase() };
+      const payload = isHourMeter ? { ...form, horasTrabajadas: calculatedHours, cantidadPago: '0' } : form;
+      await addRecord(payload);
+      const record: VehicleRecord = { ...payload, item: String(Date.now()), cantidadPago: Number(payload.cantidadPago) || 0, placa: payload.placa.toUpperCase(), horometroAnterior: Number(payload.horometroAnterior || 0), horometroActual: Number(payload.horometroActual || 0), horasTrabajadas: Number(payload.horasTrabajadas || 0), cambioAceite: payload.cambioAceite };
       onSaved(record);
       setStatus('Registro guardado correctamente.');
       setForm(emptyForm);
@@ -389,11 +444,36 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
       setStatus(error instanceof Error ? error.message : 'No se pudo guardar el registro.');
     } finally { setSaving(false); }
   }
-  return <AnimatePresence>{open && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.form className="modal" onSubmit={submit} initial={{ scale: .96, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 20 }}><div className="modal-head"><div><span className="eyebrow"><Plus size={14} /> Nuevo registro</span><h2>Agregar servicio vehicular</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={20} /></button></div><div className="form-grid"><Field label="Fecha" type="date" value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /><Field label="Lugar" value={form.lugar} onChange={(v) => setForm({ ...form, lugar: v })} /><Field label="Maestro" value={form.maestro} onChange={(v) => setForm({ ...form, maestro: v })} /><Field label="Taller" value={form.taller} onChange={(v) => setForm({ ...form, taller: v })} /><Field label="Chofer" value={form.chofer} onChange={(v) => setForm({ ...form, chofer: v })} /><Field label="Placa" value={form.placa} onChange={(v) => setForm({ ...form, placa: v.toUpperCase() })} /><Field label="Cantidad de pago" type="number" value={form.cantidadPago} onChange={(v) => setForm({ ...form, cantidadPago: v })} /><label>Tipo de servicio<select value={form.tipoServicio} onChange={(e) => setForm({ ...form, tipoServicio: e.target.value as ServiceName })}>{SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><label className="span-2">Descripcion<textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required /></label></div>{status && <div className={`alert ${status.includes('correctamente') ? 'success' : 'error'}`}>{status}</div>}<button className="primary full" disabled={saving}>{saving ? 'Guardando...' : 'Guardar en Google Sheets'}</button>{confirming && <div className="confirm-box"><strong>Estas seguro en guardar?</strong><p>Revisa que la placa, fecha, servicio y monto esten correctos antes de enviar el registro.</p><div className="confirm-actions"><button type="button" className="primary" disabled={saving} onClick={confirmSave}>Si</button><button type="button" className="secondary" disabled={saving} onClick={() => setConfirming(false)}>No</button></div></div>}</motion.form></motion.div>}</AnimatePresence>;
+  return <AnimatePresence>{open && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.form className="modal" onSubmit={submit} initial={{ scale: .96, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 20 }}><div className="modal-head"><div><span className="eyebrow"><Plus size={14} /> Nuevo registro</span><h2>Agregar servicio vehicular</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={20} /></button></div><div className="form-grid"><label>Tipo de servicio<select value={form.tipoServicio} onChange={(e) => setForm({ ...emptyForm, tipoServicio: e.target.value as ServiceName, fecha: form.fecha })}>{SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><Field label="Fecha" type="date" value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /><Field label="Lugar" value={form.lugar} onChange={(v) => setForm({ ...form, lugar: v })} /><Field label="Chofer" value={form.chofer} onChange={(v) => setForm({ ...form, chofer: v })} /><Field label="Placa" value={form.placa} onChange={(v) => setForm({ ...form, placa: v.toUpperCase() })} />{isHourMeter ? <><Field label="Horometro anterior" type="number" value={String(form.horometroAnterior || '')} onChange={(v) => setForm({ ...form, horometroAnterior: Number(v) })} /><Field label="Horometro actual" type="number" value={String(form.horometroActual || '')} onChange={(v) => setForm({ ...form, horometroActual: Number(v) })} /><label>Horas trabajadas<input readOnly value={calculatedHours} /></label><label>Cambio de aceite?<select value={form.cambioAceite || 'NO'} onChange={(e) => setForm({ ...form, cambioAceite: e.target.value as 'SI' | 'NO' })}><option>NO</option><option>SI</option></select></label></> : <><Field label="Maestro" value={form.maestro} onChange={(v) => setForm({ ...form, maestro: v })} /><Field label="Taller" value={form.taller} onChange={(v) => setForm({ ...form, taller: v })} /><Field label="Cantidad de pago" type="number" value={form.cantidadPago} onChange={(v) => setForm({ ...form, cantidadPago: v })} /></>}<label className="span-2">Descripcion<textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required /></label></div>{isHourMeter && <div className="alert success">Si marca NO, estas horas se acumulan para la alerta de 250 horas sin cambio de aceite.</div>}{status && <div className={`alert ${status.includes('correctamente') ? 'success' : 'error'}`}>{status}</div>}<button className="primary full" disabled={saving}>{saving ? 'Guardando...' : 'Guardar en Google Sheets'}</button>{confirming && <div className="confirm-box"><strong>Estas seguro en guardar?</strong><p>Revisa que la placa, fecha, servicio y datos del horometro esten correctos antes de enviar el registro.</p><div className="confirm-actions"><button type="button" className="primary" disabled={saving} onClick={confirmSave}>Si</button><button type="button" className="secondary" disabled={saving} onClick={() => setConfirming(false)}>No</button></div></div>}</motion.form></motion.div>}</AnimatePresence>;
 }
 
 function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return <label>{label}<input required type={type} value={value} onChange={(e) => onChange(e.target.value)} /></label>;
+}
+
+function getHourMeterAlerts(records: VehicleRecord[]) {
+  const byPlate = records.filter((record) => record.tipoServicio === 'Control horometro').reduce((acc, record) => {
+    acc[record.placa] = acc[record.placa] || [];
+    acc[record.placa].push(record);
+    return acc;
+  }, {} as Record<string, VehicleRecord[]>);
+  return Object.entries(byPlate).map(([placa, plateRecords]) => {
+    const sorted = [...plateRecords].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    let hours = 0;
+    let lastDate = '';
+    sorted.forEach((record) => {
+      lastDate = record.fecha || lastDate;
+      if (record.cambioAceite === 'SI') hours = 0;
+      else hours += record.horasTrabajadas || 0;
+    });
+    return { placa, hours, lastDate };
+  }).filter((alert) => alert.hours >= 250);
+}
+
+function HourMeterAlerts({ alerts }: { alerts: Array<{ placa: string; hours: number; lastDate: string }> }) {
+  if (!alerts.length) return null;
+  const phones = ['593939069555', '593997882191'];
+  return <section className="alert-panel"><div><span className="eyebrow"><MessageCircle size={16} /> Alerta WhatsApp</span><h2>Vehiculos con 250 horas o mas sin cambio de aceite</h2><p>La web deja listo el aviso por WhatsApp. Para envio totalmente automatico se debe conectar una API oficial de WhatsApp Business o Twilio.</p></div>{alerts.map((alert) => <div className="alert-row" key={alert.placa}><strong>{alert.placa}</strong><span>{alert.hours} horas acumuladas desde el ultimo cambio</span><div className="export-actions">{phones.map((phone) => <a className="secondary" key={phone} href={`https://wa.me/${phone}?text=${encodeURIComponent(`ALERTA PUNTO PAS: La placa ${alert.placa} tiene ${alert.hours} horas acumuladas sin cambio de aceite. Ultimo registro: ${alert.lastDate}.`)}`} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Avisar {phone}</a>)}</div></div>)}</section>;
 }
 
 function ModuleView({ service, records, filters, setFilters, onBack, onAdd, nightMode, onToggleNight }: { service: ServiceName; records: VehicleRecord[]; filters: Filters; setFilters: (filters: Filters) => void; onBack: () => void; onAdd: () => void; nightMode: boolean; onToggleNight: () => void }) {
@@ -429,10 +509,11 @@ function Dashboard() {
   const byPlate = Object.entries(filtered.reduce((acc, r) => { acc[r.placa] = (acc[r.placa] || 0) + r.cantidadPago; return acc; }, {} as Record<string, number>)).sort((a, b) => b[1] - a[1]);
   const last = [...filtered].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   const avgByVehicle = byPlate.length ? totalPaid / byPlate.length : 0;
+  const hourMeterAlerts = getHourMeterAlerts(filtered);
 
   function logout() { sessionStorage.removeItem('punto-pas-session'); window.location.reload(); }
 
-  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
+  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={service === 'Control horometro' ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
 }
 
 function App() {
