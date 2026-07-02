@@ -59,6 +59,30 @@ Para envio 100% automatico por WhatsApp se debe conectar una API oficial de What
 
 Despues de modificar `apps-script/Code.gs`, publica una nueva version del Web App en Apps Script para que Google Sheets reciba tambien los registros de horometro.
 
+## WhatsApp automatico
+
+El Apps Script ya incluye integracion con Meta WhatsApp Cloud API. Para activarla, en Apps Script abre `Project Settings > Script properties` y agrega:
+
+```text
+WHATSAPP_PHONE_NUMBER_ID=tu_phone_number_id
+WHATSAPP_ACCESS_TOKEN=tu_access_token
+WHATSAPP_TEMPLATE_NAME=alerta_horometro
+WHATSAPP_LANGUAGE_CODE=es
+```
+
+La plantilla aprobada en Meta debe tener 3 variables:
+
+```text
+ALERTA PUNTO PAS: La placa {{1}} tiene {{2}} horas acumuladas sin cambio de aceite. Ultimo registro: {{3}}.
+```
+
+Cuando una placa llegue a 250 horas o mas sin cambio de aceite, Apps Script enviara automaticamente el mensaje a:
+
+- `593939069555`
+- `593997882191`
+
+El script crea una hoja `ALERTAS HOROMETRO` para evitar repetir la misma alerta dentro del mismo bloque de 250 horas.
+
 11. Reinicia la app con `npm run dev`.
 
 Si no se configura `VITE_GOOGLE_SCRIPT_URL`, el formulario abre pero no puede escribir en Google Sheets.
