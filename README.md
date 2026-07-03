@@ -79,7 +79,6 @@ ALERTA PUNTO PAS: La placa {{1}} tiene {{2}} horas acumuladas sin cambio de acei
 Cuando una placa llegue a 250 horas o mas sin cambio de aceite, Apps Script enviara automaticamente el mensaje a:
 
 - `593939069555`
-- `593997882191`
 
 El script crea una hoja `ALERTAS HOROMETRO` para evitar repetir la misma alerta dentro del mismo bloque de 250 horas.
 

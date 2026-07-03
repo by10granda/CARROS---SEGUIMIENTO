@@ -146,7 +146,7 @@ function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
   const token = properties.getProperty('WHATSAPP_ACCESS_TOKEN');
   const templateName = properties.getProperty('WHATSAPP_TEMPLATE_NAME') || 'alerta_horometro';
   const languageCode = properties.getProperty('WHATSAPP_LANGUAGE_CODE') || 'es';
-  const recipients = ['593939069555', '593997882191'];
+  const recipients = ['593939069555'];
 
   if (!phoneNumberId || !token) {
     registerHourMeterAlert(placa, hours, lastDate, 'PENDIENTE_CONFIGURACION_WHATSAPP');
