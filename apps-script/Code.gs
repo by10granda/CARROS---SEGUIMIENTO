@@ -34,12 +34,11 @@ function doPost(e) {
         data.fecha || '',
         data.lugar || '',
         data.chofer || '',
+        String(data.placa || '').toUpperCase(),
         Number(data.horometroAnterior || 0),
         Number(data.horometroActual || 0),
-        Number(data.horasTrabajadas || 0),
-        String(data.placa || '').toUpperCase(),
-        String(data.cambioAceite || 'NO').toUpperCase(),
-        data.descripcion || ''
+        data.descripcion || '',
+        String(data.cambioAceite || 'NO').toUpperCase()
       ]);
       processHourMeterAlert(String(data.placa || '').toUpperCase());
       return jsonResponse({ ok: true });
@@ -75,7 +74,7 @@ function getOrCreateHourMeterSheet() {
   let sheet = spreadsheet.getSheetByName('CONTROL HOROMETRO');
   if (!sheet) {
     sheet = spreadsheet.insertSheet('CONTROL HOROMETRO');
-    sheet.appendRow(['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'HOROMETRO ANTERIOR', 'HOROMETRO ACTUAL', 'HORAS TRABAJADAS', 'PLACA', 'CAMBIO DE ACEITE?', 'DESCRIPCION']);
+    sheet.appendRow(['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'PLACA', 'HOROMETRO INICIAL', 'HOROMETRO FINAL', 'DESCRIPCION', 'CAMBIO DE ACEITE']);
   }
   return sheet;
 }
@@ -90,7 +89,7 @@ function processHourMeterAlert(placa) {
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    const rowPlate = String(row[7] || '').toUpperCase();
+    const rowPlate = String(row[4] || '').toUpperCase();
     if (rowPlate !== placa) continue;
 
     lastDate = row[1] || lastDate;
@@ -98,7 +97,7 @@ function processHourMeterAlert(placa) {
     if (changedOil) {
       accumulatedHours = 0;
     } else {
-      accumulatedHours += Number(row[6] || 0);
+      accumulatedHours += Math.max(0, Number(row[6] || 0) - Number(row[5] || 0));
     }
   }
 

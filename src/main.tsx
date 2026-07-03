@@ -149,9 +149,9 @@ async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
   const dataRows = rows.filter((row) => String(row[0]).toUpperCase() !== 'ITEM' && row.some(Boolean));
   if (service === 'Control horometro') {
     return dataRows.map((row) => {
-      const anterior = parseNumber(row[4]);
-      const actual = parseNumber(row[5]);
-      const horas = parseNumber(row[6]) || Math.max(0, actual - anterior);
+      const anterior = parseNumber(row[5]);
+      const actual = parseNumber(row[6]);
+      const horas = Math.max(0, actual - anterior);
       return {
         item: String(row[0] ?? ''),
         fecha: normalizeDate(String(row[1] ?? '')),
@@ -159,9 +159,9 @@ async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
         maestro: '',
         taller: '',
         chofer: String(row[3] ?? ''),
-        placa: String(row[7] ?? '').toUpperCase(),
+        placa: String(row[4] ?? '').toUpperCase(),
         cantidadPago: 0,
-        descripcion: String(row[9] ?? ''),
+        descripcion: String(row[7] ?? ''),
         tipoServicio: service,
         horometroAnterior: anterior,
         horometroActual: actual,
