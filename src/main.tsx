@@ -61,6 +61,9 @@ type VehicleRecord = {
   horometroActual?: number;
   horasTrabajadas?: number;
   cambioAceite?: 'SI' | 'NO' | '';
+  kilometrajeInicial?: number;
+  kilometrajeFinal?: number;
+  sumaKilometraje?: number;
 };
 
 type Filters = {
@@ -116,6 +119,9 @@ const emptyForm: FormState = {
   horometroActual: 0,
   horasTrabajadas: 0,
   cambioAceite: 'NO',
+  kilometrajeInicial: 0,
+  kilometrajeFinal: 0,
+  sumaKilometraje: 0,
 };
 
 function money(value: number) {
@@ -181,6 +187,9 @@ async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
     cantidadPago: parseNumber(row[7]),
     descripcion: String(row[8] ?? ''),
     tipoServicio: service,
+    kilometrajeInicial: service === 'Cambio de aceite' ? parseNumber(row[9]) : 0,
+    kilometrajeFinal: service === 'Cambio de aceite' ? parseNumber(row[10]) : 0,
+    sumaKilometraje: service === 'Cambio de aceite' ? parseNumber(row[11]) : 0,
   }));
 }
 
@@ -310,7 +319,8 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
   const visible = sorted.slice((page - 1) * pageSize, page * pageSize);
   const total = records.reduce((sum, record) => sum + record.cantidadPago, 0);
   const isHourMeter = service === 'Control horometro';
-  const tableKeys = isHourMeter ? ['fecha', 'placa', 'chofer', 'lugar', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
+  const isOilChange = service === 'Cambio de aceite';
+  const tableKeys = isHourMeter ? ['fecha', 'placa', 'chofer', 'lugar', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'descripcion'] : isOilChange ? ['fecha', 'placa', 'chofer', 'taller', 'lugar', 'kilometrajeInicial', 'kilometrajeFinal', 'sumaKilometraje', 'cantidadPago', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
 
   useEffect(() => setPage(1), [records.length]);
 
@@ -328,10 +338,10 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
           <tbody>
             {visible.map((record, index) => (
               <tr key={`${record.tipoServicio}-${record.item}-${index}`}>
-                {isHourMeter ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Horometro anterior">{record.horometroAnterior || 0}</td><td data-label="Horometro actual">{record.horometroActual || 0}</td><td data-label="Horas trabajadas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
+                {isHourMeter ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Horometro anterior">{record.horometroAnterior || 0}</td><td data-label="Horometro actual">{record.horometroActual || 0}</td><td data-label="Horas trabajadas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Descripcion">{record.descripcion}</td></> : isOilChange ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Km inicial">{record.kilometrajeInicial || 0}</td><td data-label="Km final">{record.kilometrajeFinal || 0}</td><td data-label="Suma kilometraje">{record.sumaKilometraje || 0}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
               </tr>
             ))}
-            {!visible.length && <tr><td colSpan={isHourMeter ? 9 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
+            {!visible.length && <tr><td colSpan={isHourMeter ? 9 : isOilChange ? 10 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -341,13 +351,14 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
 }
 
 function labelFor(key: string) {
-  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', horometroAnterior: 'Horometro anterior', horometroActual: 'Horometro actual', horasTrabajadas: 'Horas trabajadas', cambioAceite: 'Cambio aceite?' } as Record<string, string>)[key] || key;
+  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', horometroAnterior: 'Horometro anterior', horometroActual: 'Horometro actual', horasTrabajadas: 'Horas trabajadas', cambioAceite: 'Cambio aceite?', kilometrajeInicial: 'Km inicial', kilometrajeFinal: 'Km final', sumaKilometraje: 'Suma kilometraje' } as Record<string, string>)[key] || key;
 }
 
 function ExportButtons({ records, title, filters, service }: { records: VehicleRecord[]; title: string; filters: Filters; service?: ServiceName }) {
   function excel() {
     const isHourMeter = service === 'Control horometro';
-    const header = isHourMeter ? ['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'HOROMETRO ANTERIOR', 'HOROMETRO ACTUAL', 'HORAS TRABAJADAS', 'PLACA', 'CAMBIO DE ACEITE?', 'DESCRIPCION'] : ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
+    const isOilChange = service === 'Cambio de aceite';
+    const header = isHourMeter ? ['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'HOROMETRO ANTERIOR', 'HOROMETRO ACTUAL', 'HORAS TRABAJADAS', 'PLACA', 'CAMBIO DE ACEITE?', 'DESCRIPCION'] : isOilChange ? ['ITEM', 'FECHA', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION', 'KILOMETRAJE INICIAL', 'KILOMETRAJE FINAL', 'SUMA KILOMETRAJE'] : ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
     const body = records.map((record, index) => isHourMeter ? [
       record.item || String(index + 1),
       record.fecha,
@@ -359,6 +370,19 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       record.placa,
       record.cambioAceite || 'NO',
       record.descripcion,
+    ] : isOilChange ? [
+      record.item || String(index + 1),
+      record.fecha,
+      record.lugar,
+      record.maestro,
+      record.taller,
+      record.chofer,
+      record.placa,
+      record.cantidadPago,
+      record.descripcion,
+      record.kilometrajeInicial || 0,
+      record.kilometrajeFinal || 0,
+      record.sumaKilometraje || 0,
     ] : [
       record.item || String(index + 1),
       record.fecha,
@@ -380,13 +404,13 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       header,
       ...body,
       [],
-      isHourMeter ? ['', '', '', '', '', 'TOTAL HORAS', records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0), '', '', ''] : ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
+      isHourMeter ? ['', '', '', '', '', 'TOTAL HORAS', records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0), '', '', ''] : isOilChange ? ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), '', 'TOTAL KM', records.reduce((sum, record) => sum + (record.kilometrajeFinal || 0) - (record.kilometrajeInicial || 0), 0)] : ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
     ]);
     ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } },
-      { s: { r: 3, c: 0 }, e: { r: 3, c: 9 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: isOilChange ? 11 : 9 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: isOilChange ? 11 : 9 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: isOilChange ? 11 : 9 } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: isOilChange ? 11 : 9 } },
     ];
     ws['!cols'] = [
       { wch: 10 },
@@ -400,20 +424,21 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       { wch: 20 },
       { wch: 45 },
     ];
-    ws['!autofilter'] = { ref: `A6:J${Math.max(6, body.length + 6)}` };
+    ws['!autofilter'] = { ref: `A6:${isOilChange ? 'L' : 'J'}${Math.max(6, body.length + 6)}` };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
     XLSX.writeFile(wb, `${title.replace(/\s+/g, '_')}.xlsx`);
   }
   function pdf() {
     const isHourMeter = service === 'Control horometro';
+    const isOilChange = service === 'Cambio de aceite';
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFillColor(255, 0, 0); doc.rect(10, 10, 12, 12, 'F');
     doc.setFillColor(37, 255, 0); doc.rect(22, 10, 12, 12, 'F');
     doc.setFontSize(16); doc.text('Distribuidor Punto PAS', 40, 16);
     doc.setFontSize(11); doc.text(title, 40, 23);
     doc.text(`Generado: ${new Date().toLocaleString('es-DO')} | Placa: ${filters.placa || 'Todas'} | Servicio: ${service || 'Todos'}`, 10, 34);
-    autoTable(doc, { startY: 40, head: [isHourMeter ? ['Fecha', 'Placa', 'Chofer', 'Lugar', 'Anterior', 'Actual', 'Horas', 'Cambio aceite', 'Descripcion'] : ['Fecha', 'Servicio', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Pago', 'Descripcion']], body: isHourMeter ? records.map((r) => [r.fecha, r.placa, r.chofer, r.lugar, r.horometroAnterior || 0, r.horometroActual || 0, r.horasTrabajadas || 0, r.cambioAceite || 'NO', r.descripcion]) : records.map((r) => [r.fecha, r.tipoServicio, r.placa, r.chofer, r.taller, r.lugar, money(r.cantidadPago), r.descripcion]), styles: { fontSize: 8 }, headStyles: { fillColor: [255, 0, 0] } });
+    autoTable(doc, { startY: 40, head: [isHourMeter ? ['Fecha', 'Placa', 'Chofer', 'Lugar', 'Anterior', 'Actual', 'Horas', 'Cambio aceite', 'Descripcion'] : isOilChange ? ['Fecha', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Km inicial', 'Km final', 'Suma km', 'Pago', 'Descripcion'] : ['Fecha', 'Servicio', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Pago', 'Descripcion']], body: isHourMeter ? records.map((r) => [r.fecha, r.placa, r.chofer, r.lugar, r.horometroAnterior || 0, r.horometroActual || 0, r.horasTrabajadas || 0, r.cambioAceite || 'NO', r.descripcion]) : isOilChange ? records.map((r) => [r.fecha, r.placa, r.chofer, r.taller, r.lugar, r.kilometrajeInicial || 0, r.kilometrajeFinal || 0, r.sumaKilometraje || 0, money(r.cantidadPago), r.descripcion]) : records.map((r) => [r.fecha, r.tipoServicio, r.placa, r.chofer, r.taller, r.lugar, money(r.cantidadPago), r.descripcion]), styles: { fontSize: 8 }, headStyles: { fillColor: [255, 0, 0] } });
     doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
   }
   return <div className="export-actions"><button className="secondary" onClick={excel}><FileSpreadsheet size={16} /> Excel</button><button className="secondary" onClick={pdf}><FileText size={16} /> PDF</button></div>;
@@ -430,13 +455,17 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
   return <div className="chart-card"><h3>{title}</h3>{children}</div>;
 }
 
-function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: (record: VehicleRecord) => void }) {
+function RecordModal({ open, records, onClose, onSaved }: { open: boolean; records: VehicleRecord[]; onClose: () => void; onSaved: (record: VehicleRecord) => void }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const isHourMeter = form.tipoServicio === 'Control horometro';
+  const isOilChange = form.tipoServicio === 'Cambio de aceite';
   const calculatedHours = Math.max(0, Number(form.horometroActual || 0) - Number(form.horometroAnterior || 0));
+  const calculatedKm = Math.max(0, Number(form.kilometrajeFinal || 0) - Number(form.kilometrajeInicial || 0));
+  const previousKm = records.filter((record) => record.tipoServicio === 'Cambio de aceite' && record.placa === form.placa.toUpperCase()).reduce((sum, record) => sum + (record.kilometrajeFinal || 0) - (record.kilometrajeInicial || 0), 0);
+  const totalKm = previousKm + calculatedKm;
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setConfirming(true);
@@ -444,9 +473,9 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
   async function confirmSave() {
     setSaving(true); setStatus('');
     try {
-      const payload = isHourMeter ? { ...form, horasTrabajadas: calculatedHours, cantidadPago: '0' } : form;
+      const payload = isHourMeter ? { ...form, horasTrabajadas: calculatedHours, cantidadPago: '0' } : isOilChange ? { ...form, sumaKilometraje: totalKm } : form;
       await addRecord(payload);
-      const record: VehicleRecord = { ...payload, item: String(Date.now()), cantidadPago: Number(payload.cantidadPago) || 0, placa: payload.placa.toUpperCase(), horometroAnterior: Number(payload.horometroAnterior || 0), horometroActual: Number(payload.horometroActual || 0), horasTrabajadas: Number(payload.horasTrabajadas || 0), cambioAceite: payload.cambioAceite };
+      const record: VehicleRecord = { ...payload, item: String(Date.now()), cantidadPago: Number(payload.cantidadPago) || 0, placa: payload.placa.toUpperCase(), horometroAnterior: Number(payload.horometroAnterior || 0), horometroActual: Number(payload.horometroActual || 0), horasTrabajadas: Number(payload.horasTrabajadas || 0), cambioAceite: payload.cambioAceite, kilometrajeInicial: Number(payload.kilometrajeInicial || 0), kilometrajeFinal: Number(payload.kilometrajeFinal || 0), sumaKilometraje: Number(payload.sumaKilometraje || 0) };
       onSaved(record);
       setStatus('Registro guardado correctamente.');
       setForm(emptyForm);
@@ -456,7 +485,7 @@ function RecordModal({ open, onClose, onSaved }: { open: boolean; onClose: () =>
       setStatus(error instanceof Error ? error.message : 'No se pudo guardar el registro.');
     } finally { setSaving(false); }
   }
-  return <AnimatePresence>{open && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.form className="modal" onSubmit={submit} initial={{ scale: .96, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 20 }}><div className="modal-head"><div><span className="eyebrow"><Plus size={14} /> Nuevo registro</span><h2>Agregar servicio vehicular</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={20} /></button></div><div className="form-grid"><label>Tipo de servicio<select value={form.tipoServicio} onChange={(e) => setForm({ ...emptyForm, tipoServicio: e.target.value as ServiceName, fecha: form.fecha })}>{SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><Field label="Fecha" type="date" value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /><Field label="Lugar" value={form.lugar} onChange={(v) => setForm({ ...form, lugar: v })} /><Field label="Chofer" value={form.chofer} onChange={(v) => setForm({ ...form, chofer: v })} /><Field label="Placa" value={form.placa} onChange={(v) => setForm({ ...form, placa: v.toUpperCase() })} />{isHourMeter ? <><Field label="Horometro anterior" type="number" value={String(form.horometroAnterior || '')} onChange={(v) => setForm({ ...form, horometroAnterior: Number(v) })} /><Field label="Horometro actual" type="number" value={String(form.horometroActual || '')} onChange={(v) => setForm({ ...form, horometroActual: Number(v) })} /><label>Horas trabajadas<input readOnly value={calculatedHours} /></label><label>Cambio de aceite?<select value={form.cambioAceite || 'NO'} onChange={(e) => setForm({ ...form, cambioAceite: e.target.value as 'SI' | 'NO' })}><option>NO</option><option>SI</option></select></label></> : <><Field label="Maestro" value={form.maestro} onChange={(v) => setForm({ ...form, maestro: v })} /><Field label="Taller" value={form.taller} onChange={(v) => setForm({ ...form, taller: v })} /><Field label="Cantidad de pago" type="number" value={form.cantidadPago} onChange={(v) => setForm({ ...form, cantidadPago: v })} /></>}<label className="span-2">Descripcion<textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required /></label></div>{isHourMeter && <div className="alert success">Si marca NO, estas horas se acumulan para la alerta de 250 horas sin cambio de aceite.</div>}{status && <div className={`alert ${status.includes('correctamente') ? 'success' : 'error'}`}>{status}</div>}<button className="primary full" disabled={saving}>{saving ? 'Guardando...' : 'Guardar en Google Sheets'}</button>{confirming && <div className="confirm-box"><strong>Estas seguro en guardar?</strong><p>Revisa que la placa, fecha, servicio y datos del horometro esten correctos antes de enviar el registro.</p><div className="confirm-actions"><button type="button" className="primary" disabled={saving} onClick={confirmSave}>Si</button><button type="button" className="secondary" disabled={saving} onClick={() => setConfirming(false)}>No</button></div></div>}</motion.form></motion.div>}</AnimatePresence>;
+  return <AnimatePresence>{open && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.form className="modal" onSubmit={submit} initial={{ scale: .96, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 20 }}><div className="modal-head"><div><span className="eyebrow"><Plus size={14} /> Nuevo registro</span><h2>Agregar servicio vehicular</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={20} /></button></div><div className="form-grid"><label>Tipo de servicio<select value={form.tipoServicio} onChange={(e) => setForm({ ...emptyForm, tipoServicio: e.target.value as ServiceName, fecha: form.fecha })}>{SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><Field label="Fecha" type="date" value={form.fecha} onChange={(v) => setForm({ ...form, fecha: v })} /><Field label="Lugar" value={form.lugar} onChange={(v) => setForm({ ...form, lugar: v })} /><Field label="Chofer" value={form.chofer} onChange={(v) => setForm({ ...form, chofer: v })} /><Field label="Placa" value={form.placa} onChange={(v) => setForm({ ...form, placa: v.toUpperCase() })} />{isHourMeter ? <><Field label="Horometro anterior" type="number" value={String(form.horometroAnterior || '')} onChange={(v) => setForm({ ...form, horometroAnterior: Number(v) })} /><Field label="Horometro actual" type="number" value={String(form.horometroActual || '')} onChange={(v) => setForm({ ...form, horometroActual: Number(v) })} /><label>Horas trabajadas<input readOnly value={calculatedHours} /></label><label>Cambio de aceite?<select value={form.cambioAceite || 'NO'} onChange={(e) => setForm({ ...form, cambioAceite: e.target.value as 'SI' | 'NO' })}><option>NO</option><option>SI</option></select></label></> : <><Field label="Maestro" value={form.maestro} onChange={(v) => setForm({ ...form, maestro: v })} /><Field label="Taller" value={form.taller} onChange={(v) => setForm({ ...form, taller: v })} /><Field label="Cantidad de pago" type="number" value={form.cantidadPago} onChange={(v) => setForm({ ...form, cantidadPago: v })} /></>}{isOilChange && <><Field label="Kilometraje inicial" type="number" value={String(form.kilometrajeInicial || '')} onChange={(v) => setForm({ ...form, kilometrajeInicial: Number(v) })} /><Field label="Kilometraje final" type="number" value={String(form.kilometrajeFinal || '')} onChange={(v) => setForm({ ...form, kilometrajeFinal: Number(v) })} /><label>Suma kilometraje<input readOnly value={totalKm} /></label></>}<label className="span-2">Descripcion<textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required /></label></div>{isHourMeter && <div className="alert success">Si marca NO, estas horas se acumulan para la alerta de 250 horas sin cambio de aceite.</div>}{isOilChange && <div className="alert success">La suma kilometraje se calcula automaticamente por placa: acumulado anterior + kilometraje final menos inicial.</div>}{status && <div className={`alert ${status.includes('correctamente') ? 'success' : 'error'}`}>{status}</div>}<button className="primary full" disabled={saving}>{saving ? 'Guardando...' : 'Guardar en Google Sheets'}</button>{confirming && <div className="confirm-box"><strong>Estas seguro en guardar?</strong><p>Revisa que la placa, fecha, servicio y kilometrajes esten correctos antes de enviar el registro.</p><div className="confirm-actions"><button type="button" className="primary" disabled={saving} onClick={confirmSave}>Si</button><button type="button" className="secondary" disabled={saving} onClick={() => setConfirming(false)}>No</button></div></div>}</motion.form></motion.div>}</AnimatePresence>;
 }
 
 function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
@@ -513,7 +542,7 @@ function Dashboard() {
   }, []);
 
   if (activeService) {
-    return <><ModuleView service={activeService} records={records} filters={filters} setFilters={setFilters} onBack={() => setActiveService(null)} onAdd={() => setModalOpen(true)} nightMode={nightMode} onToggleNight={() => setNightMode((value) => !value)} /><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /></>;
+    return <><ModuleView service={activeService} records={records} filters={filters} setFilters={setFilters} onBack={() => setActiveService(null)} onAdd={() => setModalOpen(true)} nightMode={nightMode} onToggleNight={() => setNightMode((value) => !value)} /><RecordModal open={modalOpen} records={records} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /></>;
   }
 
   const filtered = applyFilters(records, filters);
@@ -540,7 +569,7 @@ function Dashboard() {
 
   function logout() { sessionStorage.removeItem('punto-pas-session'); window.location.reload(); }
 
-  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={configureWhatsApp}><MessageCircle size={16} /> Configurar WhatsApp</button><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={service === 'Control horometro' ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
+  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={configureWhatsApp}><MessageCircle size={16} /> Configurar WhatsApp</button><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={service === 'Control horometro' ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} records={records} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
 }
 
 function App() {

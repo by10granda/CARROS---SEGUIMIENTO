@@ -43,6 +43,26 @@ function doPost(e) {
       processHourMeterAlert(String(data.placa || '').toUpperCase());
       return jsonResponse({ ok: true });
     }
+    if (sheetName === 'Cambio de aceite') {
+      const kmInicial = Number(data.kilometrajeInicial || 0);
+      const kmFinal = Number(data.kilometrajeFinal || 0);
+      const sumaKm = calculateOilMileageSum(sheet, String(data.placa || '').toUpperCase(), kmInicial, kmFinal);
+      sheet.appendRow([
+        item,
+        data.fecha || '',
+        data.lugar || '',
+        data.maestro || '',
+        data.taller || '',
+        data.chofer || '',
+        String(data.placa || '').toUpperCase(),
+        Number(data.cantidadPago || 0),
+        data.descripcion || '',
+        kmInicial,
+        kmFinal,
+        sumaKm
+      ]);
+      return jsonResponse({ ok: true });
+    }
     sheet.appendRow([
       item,
       data.fecha || '',
@@ -59,6 +79,19 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse({ ok: false, error: error.message });
   }
+}
+
+function calculateOilMileageSum(sheet, placa, kmInicial, kmFinal) {
+  const values = sheet.getDataRange().getValues();
+  let total = 0;
+  for (let i = 1; i < values.length; i++) {
+    const rowPlate = String(values[i][6] || '').toUpperCase();
+    if (rowPlate !== placa) continue;
+    const storedSum = Number(values[i][11] || 0);
+    if (storedSum > total) total = storedSum;
+    if (!storedSum) total += Math.max(0, Number(values[i][10] || 0) - Number(values[i][9] || 0));
+  }
+  return total + Math.max(0, Number(kmFinal || 0) - Number(kmInicial || 0));
 }
 
 function configureWhatsApp(data) {
