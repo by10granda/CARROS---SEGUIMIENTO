@@ -136,8 +136,10 @@ function processHourMeterAlert(placa) {
 
   if (accumulatedHours < 250 || wasHourMeterAlertSent(placa, accumulatedHours)) return;
 
-  sendWhatsAppHourMeterAlert(placa, accumulatedHours, lastDate);
-  registerHourMeterAlert(placa, accumulatedHours, lastDate);
+  const results = sendWhatsAppHourMeterAlert(placa, accumulatedHours, lastDate);
+  results.forEach(function (result) {
+    registerHourMeterAlert(placa, accumulatedHours, lastDate, result.status, result.response);
+  });
 }
 
 function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
@@ -149,11 +151,11 @@ function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
   const recipients = ['593939069555'];
 
   if (!phoneNumberId || !token) {
-    registerHourMeterAlert(placa, hours, lastDate, 'PENDIENTE_CONFIGURACION_WHATSAPP');
-    return;
+    return [{ status: 'PENDIENTE_CONFIGURACION_WHATSAPP', response: 'Faltan WHATSAPP_PHONE_NUMBER_ID o WHATSAPP_ACCESS_TOKEN' }];
   }
 
   const url = 'https://graph.facebook.com/v25.0/' + phoneNumberId + '/messages';
+  const results = [];
 
   recipients.forEach(function (recipient) {
     const payload = {
@@ -174,14 +176,26 @@ function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
       }
     };
 
-    UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { Authorization: 'Bearer ' + token },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
+    try {
+      const response = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { Authorization: 'Bearer ' + token },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      const code = response.getResponseCode();
+      const body = response.getContentText();
+      results.push({
+        status: code >= 200 && code < 300 ? 'ENVIADA' : 'ERROR_META_' + code,
+        response: body
+      });
+    } catch (error) {
+      results.push({ status: 'ERROR_APPS_SCRIPT', response: error.message });
+    }
   });
+
+  return results;
 }
 
 function wasHourMeterAlertSent(placa, hours) {
@@ -190,17 +204,18 @@ function wasHourMeterAlertSent(placa, hours) {
   const bucket = Math.floor(Number(hours || 0) / 250);
 
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][0]).toUpperCase() === placa && Number(values[i][3]) === bucket) {
+    const response = String(values[i][6] || '');
+    if (String(values[i][0]).toUpperCase() === placa && Number(values[i][3]) === bucket && String(values[i][4]).toUpperCase() === 'ENVIADA' && response.indexOf('messages') !== -1) {
       return true;
     }
   }
   return false;
 }
 
-function registerHourMeterAlert(placa, hours, lastDate, status) {
+function registerHourMeterAlert(placa, hours, lastDate, status, response) {
   const sheet = getOrCreateAlertsSheet();
   const bucket = Math.floor(Number(hours || 0) / 250);
-  sheet.appendRow([placa, hours, lastDate, bucket, status || 'ENVIADA', new Date()]);
+  sheet.appendRow([placa, hours, lastDate, bucket, status || 'ENVIADA', new Date(), response || '']);
 }
 
 function getOrCreateAlertsSheet() {
@@ -208,7 +223,7 @@ function getOrCreateAlertsSheet() {
   let sheet = spreadsheet.getSheetByName('ALERTAS HOROMETRO');
   if (!sheet) {
     sheet = spreadsheet.insertSheet('ALERTAS HOROMETRO');
-    sheet.appendRow(['PLACA', 'HORAS', 'ULTIMA FECHA', 'BLOQUE 250H', 'ESTADO', 'FECHA ALERTA']);
+    sheet.appendRow(['PLACA', 'HORAS', 'ULTIMA FECHA', 'BLOQUE 250H', 'ESTADO', 'FECHA ALERTA', 'RESPUESTA META']);
   }
   return sheet;
 }
