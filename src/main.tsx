@@ -197,6 +197,18 @@ async function addRecord(record: FormState) {
   return response;
 }
 
+async function saveWhatsAppConfig(config: { phoneNumberId: string; accessToken: string; templateName: string; languageCode: string }) {
+  if (!SCRIPT_URL) {
+    throw new Error('Falta configurar VITE_GOOGLE_SCRIPT_URL para guardar la configuracion de WhatsApp.');
+  }
+  const response = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'configureWhatsApp', ...config }),
+  });
+  if (!response.ok) throw new Error('No se pudo guardar la configuracion de WhatsApp en Apps Script.');
+}
+
 function applyFilters(records: VehicleRecord[], filters: Filters) {
   const plate = filters.placa.trim().toUpperCase();
   return records.filter((record) => {
@@ -511,9 +523,24 @@ function Dashboard() {
   const avgByVehicle = byPlate.length ? totalPaid / byPlate.length : 0;
   const hourMeterAlerts = getHourMeterAlerts(filtered);
 
+  async function configureWhatsApp() {
+    const phoneNumberId = window.prompt('WHATSAPP_PHONE_NUMBER_ID', '1246003585254432');
+    if (!phoneNumberId) return;
+    const accessToken = window.prompt('WHATSAPP_ACCESS_TOKEN');
+    if (!accessToken) return;
+    const templateName = window.prompt('WHATSAPP_TEMPLATE_NAME', 'jaspers_market_order_confirmation_v1') || 'jaspers_market_order_confirmation_v1';
+    const languageCode = window.prompt('WHATSAPP_LANGUAGE_CODE', 'en_US') || 'en_US';
+    try {
+      await saveWhatsAppConfig({ phoneNumberId, accessToken, templateName, languageCode });
+      window.alert('WhatsApp configurado correctamente. Publica una nueva version del Apps Script si acabas de actualizar el codigo.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No se pudo configurar WhatsApp.');
+    }
+  }
+
   function logout() { sessionStorage.removeItem('punto-pas-session'); window.location.reload(); }
 
-  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={service === 'Control horometro' ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
+  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={configureWhatsApp}><MessageCircle size={16} /> Configurar WhatsApp</button><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={service === 'Control horometro' ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
 }
 
 function App() {

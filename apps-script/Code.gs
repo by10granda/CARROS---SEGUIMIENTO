@@ -14,6 +14,12 @@ function doGet() {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+
+    if (data.action === 'configureWhatsApp') {
+      configureWhatsApp(data);
+      return jsonResponse({ ok: true });
+    }
+
     const sheetName = data.tipoServicio;
     const sheet = sheetName === 'Control horometro' ? getOrCreateHourMeterSheet() : getSheetByGid(SHEET_GIDS[sheetName]);
 
@@ -54,6 +60,14 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse({ ok: false, error: error.message });
   }
+}
+
+function configureWhatsApp(data) {
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty('WHATSAPP_PHONE_NUMBER_ID', data.phoneNumberId || '');
+  properties.setProperty('WHATSAPP_ACCESS_TOKEN', data.accessToken || '');
+  properties.setProperty('WHATSAPP_TEMPLATE_NAME', data.templateName || 'jaspers_market_order_confirmation_v1');
+  properties.setProperty('WHATSAPP_LANGUAGE_CODE', data.languageCode || 'en_US');
 }
 
 function getOrCreateHourMeterSheet() {
@@ -107,7 +121,7 @@ function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
     return;
   }
 
-  const url = 'https://graph.facebook.com/v20.0/' + phoneNumberId + '/messages';
+  const url = 'https://graph.facebook.com/v25.0/' + phoneNumberId + '/messages';
 
   recipients.forEach(function (recipient) {
     const payload = {
