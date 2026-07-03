@@ -11,6 +11,11 @@ function doGet() {
   return jsonResponse({ ok: true, message: 'Punto PAS API activa' });
 }
 
+function authorizeExternalRequest() {
+  const response = UrlFetchApp.fetch('https://www.googleapis.com/discovery/v1/apis');
+  return response.getResponseCode();
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
