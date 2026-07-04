@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -517,6 +517,16 @@ function HourMeterAlerts({ alerts }: { alerts: Array<{ placa: string; hours: num
   return <section className="alert-panel"><div><span className="eyebrow"><MessageCircle size={16} /> Alerta WhatsApp</span><h2>Vehiculos con 250 horas o mas sin cambio de aceite</h2><p>La web deja listo el aviso por WhatsApp. Para envio totalmente automatico se debe conectar una API oficial de WhatsApp Business o Twilio.</p></div>{alerts.map((alert) => <div className="alert-row" key={alert.placa}><strong>{alert.placa}</strong><span>{alert.hours} horas acumuladas desde el ultimo cambio</span><div className="export-actions">{phones.map((phone) => <a className="secondary" key={phone} href={`https://wa.me/${phone}?text=${encodeURIComponent(`ALERTA PUNTO PAS: La placa ${alert.placa} tiene ${alert.hours} horas acumuladas sin cambio de aceite. Ultimo registro: ${alert.lastDate}.`)}`} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Avisar {phone}</a>)}</div></div>)}</section>;
 }
 
+function serviceFromPath() {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get('modulo');
+  return SERVICES.find((service) => service.toLowerCase().replace(/\s+/g, '-') === value) || null;
+}
+
+function servicePath(service: ServiceName) {
+  return `?modulo=${service.toLowerCase().replace(/\s+/g, '-')}`;
+}
+
 function ModuleView({ service, records, filters, setFilters, onBack, onAdd, nightMode, onToggleNight }: { service: ServiceName; records: VehicleRecord[]; filters: Filters; setFilters: (filters: Filters) => void; onBack: () => void; onAdd: () => void; nightMode: boolean; onToggleNight: () => void }) {
   const filtered = applyFilters(records.filter((r) => r.tipoServicio === service), filters);
   const Icon = serviceMeta[service].icon;
@@ -526,11 +536,12 @@ function ModuleView({ service, records, filters, setFilters, onBack, onAdd, nigh
 function Dashboard() {
   const [records, setRecords] = useState<VehicleRecord[]>([]);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [activeService, setActiveService] = useState<ServiceName | null>(null);
+  const [activeService, setActiveService] = useState<ServiceName | null>(() => serviceFromPath());
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [nightMode, setNightMode] = useState(localStorage.getItem('punto-pas-theme') === 'night');
+  const routeChangeFromPop = useRef(true);
 
   useEffect(() => {
     document.body.classList.toggle('night-mode', nightMode);
@@ -541,8 +552,36 @@ function Dashboard() {
     Promise.all(SERVICES.map(fetchSheet)).then((results) => setRecords(results.flat())).catch(() => { setRecords(mockData); setNotice('No se pudo leer Google Sheets. Se muestran datos de demostracion hasta publicar/compartir correctamente el archivo.'); }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const syncRoute = () => {
+      routeChangeFromPop.current = true;
+      setActiveService(serviceFromPath());
+    };
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, []);
+
+  useEffect(() => {
+    if (routeChangeFromPop.current) {
+      routeChangeFromPop.current = false;
+      return;
+    }
+    window.history.pushState(activeService ? { service: activeService } : {}, '', activeService ? servicePath(activeService) : window.location.pathname);
+  }, [activeService]);
+
+  function openService(service: ServiceName) {
+    window.history.pushState({ service }, '', servicePath(service));
+    setActiveService(service);
+  }
+
+  function backToDashboard() {
+    window.history.pushState({}, '', window.location.pathname);
+    routeChangeFromPop.current = true;
+    setActiveService(null);
+  }
+
   if (activeService) {
-    return <><ModuleView service={activeService} records={records} filters={filters} setFilters={setFilters} onBack={() => setActiveService(null)} onAdd={() => setModalOpen(true)} nightMode={nightMode} onToggleNight={() => setNightMode((value) => !value)} /><RecordModal open={modalOpen} records={records} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /></>;
+    return <><ModuleView service={activeService} records={records} filters={filters} setFilters={setFilters} onBack={backToDashboard} onAdd={() => setModalOpen(true)} nightMode={nightMode} onToggleNight={() => setNightMode((value) => !value)} /><RecordModal open={modalOpen} records={records} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /></>;
   }
 
   const filtered = applyFilters(records, filters);

@@ -420,7 +420,7 @@ body.night-mode {
   border: 1px solid rgba(255,255,255,.45);
   border-radius: 32px;
   background:
-    linear-gradient(135deg, rgba(25,7,8,.82) 0%, rgba(127,0,0,.70) 44%, rgba(255,0,0,.58) 100%),
+    linear-gradient(135deg, rgba(5,7,12,.58) 0%, rgba(127,0,0,.42) 46%, rgba(255,0,0,.30) 100%),
     url("https://lh3.googleusercontent.com/d/12olZygxGR7Z2BTuuhJsPCRYEBY_1nONL=w2400") center / cover no-repeat,
     radial-gradient(circle at 88% 20%, rgba(37,255,0,.30), transparent 24%),
     radial-gradient(circle at 12% 20%, rgba(255,255,255,.16), transparent 25%),
@@ -433,7 +433,9 @@ body.night-mode {
   inset: 1px;
   border-radius: 31px;
   pointer-events: none;
-  background: linear-gradient(135deg, rgba(255,255,255,.20), transparent 42%);
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.34), transparent 58%),
+    linear-gradient(135deg, rgba(255,255,255,.18), transparent 42%);
 }
 .hero h1 {
   max-width: 980px;
