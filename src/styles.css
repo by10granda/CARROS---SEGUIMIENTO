@@ -689,3 +689,53 @@ body.night-mode .service-stats strong { color: #f8fafc; }
   td { font-size: .9rem; }
   td:before { min-width: 120px; text-align: left; }
 }
+
+/* Minimalist refinement */
+:root {
+  font-family: "Inter", "SF Pro Display", "SF Pro Text", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --premium-shadow: 0 10px 34px rgba(15, 23, 42, .055), 0 1px 4px rgba(15, 23, 42, .035);
+  --premium-shadow-lg: 0 22px 70px rgba(15, 23, 42, .12);
+}
+
+body { letter-spacing: -.011em; }
+
+.topbar { box-shadow: 0 8px 28px rgba(159,18,18,.14); }
+.topbar .logo strong { font-weight: 720; letter-spacing: -.035em; }
+.topbar .logo small { font-weight: 500; }
+.topbar .ghost { font-weight: 650; box-shadow: none; }
+.topbar .ghost:hover { box-shadow: none; }
+
+.hero h1 { font-weight: 760; letter-spacing: -.075em; }
+.hero p { font-weight: 400; }
+.hero .primary { box-shadow: 0 12px 26px rgba(0,0,0,.14); }
+
+label { font-size: .8rem; font-weight: 600; letter-spacing: 0; }
+input, select, textarea { box-shadow: none; }
+
+.primary, .secondary, .ghost { font-weight: 700; }
+.primary { box-shadow: 0 10px 22px rgba(255,0,0,.18); }
+.secondary, .ghost { box-shadow: none; }
+.secondary:hover, .ghost:hover { box-shadow: none; }
+
+.summary-card, .service-card, .chart-card, .table-card, .alert-panel {
+  box-shadow: var(--premium-shadow);
+}
+.summary-card:hover, .service-card:hover, .chart-card:hover, .table-card:hover {
+  box-shadow: 0 16px 38px rgba(15,23,42,.075);
+}
+.summary-card strong { font-weight: 720; }
+.summary-card span, .summary-card small { font-weight: 600; }
+.summary-card svg { background: rgba(255,0,0,.065); }
+
+.service-icon { box-shadow: 0 8px 18px rgba(15,23,42,.10); }
+.service-card h3, .service-stats strong, .chart-card h3, .table-card h2 { font-weight: 720; }
+.service-card p, .table-toolbar p { font-weight: 450; }
+
+th { font-weight: 650; }
+td { font-weight: 450; }
+.pill { font-weight: 700; }
+
+.modal { box-shadow: var(--premium-shadow-lg); }
+.modal h2 { font-weight: 740; letter-spacing: -.04em; }
+.confirm-box { box-shadow: none; }
+.alert { box-shadow: none; }
