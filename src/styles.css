@@ -320,7 +320,7 @@ body.night-mode .confirm-box {
   display: grid;
   grid-template-columns: 120px 1fr auto;
   gap: 14px;
-  align-items: center;
+  align-items: flex-end;
   padding: 14px;
   border-radius: 18px;
   background: rgba(255,255,255,.78);
@@ -429,7 +429,7 @@ body.night-mode {
   border: 1px solid rgba(255,255,255,.45);
   border-radius: 0 0 34px 34px;
   background:
-    linear-gradient(135deg, rgba(5,7,12,.58) 0%, rgba(127,0,0,.42) 46%, rgba(255,0,0,.30) 100%),
+    linear-gradient(135deg, rgba(5,7,12,.22) 0%, rgba(127,0,0,.18) 46%, rgba(255,0,0,.10) 100%),
     url("https://lh3.googleusercontent.com/d/1H8u-lkoEH7oOTjDjfFFRAP0bbFBcAgC5=w2400") center / cover no-repeat,
     radial-gradient(circle at 88% 20%, rgba(37,255,0,.30), transparent 24%),
     radial-gradient(circle at 12% 20%, rgba(255,255,255,.16), transparent 25%),
@@ -443,9 +443,11 @@ body.night-mode {
   border-radius: 0 0 33px 33px;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(0,0,0,.34), transparent 58%),
-    linear-gradient(135deg, rgba(255,255,255,.18), transparent 42%);
+    linear-gradient(0deg, rgba(0,0,0,.58), rgba(0,0,0,.10) 48%, transparent),
+    linear-gradient(90deg, rgba(0,0,0,.22), transparent 58%),
+    linear-gradient(135deg, rgba(255,255,255,.10), transparent 42%);
 }
+.hero:not(.compact) .eyebrow { display: none; }
 .hero h1 {
   max-width: 980px;
   font-size: clamp(2.4rem, 5.4vw, 5.8rem);
