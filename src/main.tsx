@@ -75,7 +75,7 @@ type Filters = {
 type FormState = Omit<VehicleRecord, 'item' | 'cantidadPago'> & { cantidadPago: string };
 
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID || '1Evr1lpNSwLYXWgcRf5D5NSPUD5nR-YS_EczVK4PVAHI';
-const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
+const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyO36x93npGUiOrJP27s1Zdryp7E2E1rb8ak_CrAf3QRgPn05lN2H4k2jocWkQewmsB0w/exec';
 
 const SERVICES: ServiceName[] = ['Mantenimiento', 'Lavado', 'Engrasada', 'Cambio de aceite', 'Control horometro'];
 const COLORS = ['#ff0000', '#25ff00', '#111827', '#9ca3af', '#f59e0b'];
