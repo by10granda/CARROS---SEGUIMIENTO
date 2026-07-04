@@ -420,6 +420,8 @@ body.night-mode {
   border: 1px solid rgba(255,255,255,.45);
   border-radius: 32px;
   background:
+    linear-gradient(135deg, rgba(25,7,8,.82) 0%, rgba(127,0,0,.70) 44%, rgba(255,0,0,.58) 100%),
+    url("https://drive.google.com/uc?export=view&id=12olZygxGR7Z2BTuuhJsPCRYEBY_1nONL") center / cover no-repeat,
     radial-gradient(circle at 88% 20%, rgba(37,255,0,.30), transparent 24%),
     radial-gradient(circle at 12% 20%, rgba(255,255,255,.16), transparent 25%),
     linear-gradient(135deg, #190708 0%, #7f0000 42%, #ff0000 100%);
