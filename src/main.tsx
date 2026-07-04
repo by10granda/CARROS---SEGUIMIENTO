@@ -231,7 +231,7 @@ function applyFilters(records: VehicleRecord[], filters: Filters) {
 function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <div className="logo" aria-label="Distribuidor Punto PAS">
-      <img className="logo-image" src="https://lh3.googleusercontent.com/d/1H8u-lkoEH7oOTjDjfFFRAP0bbFBcAgC5=w256" alt="Punto PAS" />
+      <img className="logo-image" src="/logo-punto-pas.svg" alt="Punto PAS" />
       {!compact && <div><strong>Distribuidor Punto PAS</strong><small>Gestion vehicular</small></div>}
     </div>
   );

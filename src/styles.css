@@ -172,6 +172,8 @@ body.night-mode .ghost {
   width: 100%;
   min-height: auto;
   margin-left: 0;
+  margin-top: 30px;
+  border-radius: 32px;
 }
 
 .filter-bar {
@@ -415,20 +417,20 @@ body.night-mode {
 .page {
   width: min(1600px, 100%);
   margin: 0 auto;
-  padding: 30px clamp(16px, 3vw, 36px) 104px;
+  padding: 0 clamp(16px, 3vw, 36px) 104px;
 }
 
 .hero {
-  width: calc(100vw - 32px);
-  margin-left: calc(50% - 50vw + 16px);
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
   min-height: max(620px, calc(100vh - 112px));
   align-items: center;
   padding: clamp(30px, 5vw, 64px);
   border: 1px solid rgba(255,255,255,.45);
-  border-radius: 32px;
+  border-radius: 0 0 34px 34px;
   background:
     linear-gradient(135deg, rgba(5,7,12,.58) 0%, rgba(127,0,0,.42) 46%, rgba(255,0,0,.30) 100%),
-    url("https://lh3.googleusercontent.com/d/12olZygxGR7Z2BTuuhJsPCRYEBY_1nONL=w2400") center / cover no-repeat,
+    url("https://lh3.googleusercontent.com/d/1H8u-lkoEH7oOTjDjfFFRAP0bbFBcAgC5=w2400") center / cover no-repeat,
     radial-gradient(circle at 88% 20%, rgba(37,255,0,.30), transparent 24%),
     radial-gradient(circle at 12% 20%, rgba(255,255,255,.16), transparent 25%),
     linear-gradient(135deg, #190708 0%, #7f0000 42%, #ff0000 100%);
@@ -438,7 +440,7 @@ body.night-mode {
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: 31px;
+  border-radius: 0 0 33px 33px;
   pointer-events: none;
   background:
     linear-gradient(90deg, rgba(0,0,0,.34), transparent 58%),
