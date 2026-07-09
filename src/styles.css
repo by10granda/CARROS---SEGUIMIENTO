@@ -251,6 +251,25 @@ body.night-mode .table-card h2 { color: #f8fafc; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 18px; }
 table { width: 100%; border-collapse: collapse; min-width: 920px; }
 th, td { padding: 14px 13px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th, td {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+td[data-label="Descripcion"],
+td[data-label="Descripción"] {
+  min-width: 280px;
+  max-width: 560px;
+  line-height: 1.45;
+}
+.table-card table td:nth-child(8),
+.table-card table td:nth-child(10) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.45;
+}
 th { background: #f9fafb; color: #374151; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; user-select: none; }
 td { color: #111827; }
 tbody tr:hover { background: #fff7f7; }
