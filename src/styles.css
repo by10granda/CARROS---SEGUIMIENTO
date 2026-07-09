@@ -449,11 +449,17 @@ body.night-mode {
 }
 .hero:not(.compact) .eyebrow { display: none; }
 .hero h1 {
-  max-width: 980px;
-  font-size: clamp(2.4rem, 5.4vw, 5.8rem);
-  line-height: .9;
-  letter-spacing: -.08em;
+  max-width: min(1180px, 92vw);
+  font-size: clamp(2.1rem, 4.4vw, 4.8rem);
+  line-height: 1;
+  letter-spacing: -.065em;
   text-wrap: balance;
+}
+.hero:not(.compact) {
+  padding-bottom: clamp(110px, 13vh, 170px);
+}
+.hero:not(.compact) > div {
+  max-width: min(1220px, 94vw);
 }
 .hero p { color: rgba(255,255,255,.80); font-size: clamp(1rem, 1.6vw, 1.2rem); }
 .hero .primary {
@@ -707,7 +713,7 @@ body { letter-spacing: -.011em; }
 .topbar .ghost { font-weight: 650; box-shadow: none; }
 .topbar .ghost:hover { box-shadow: none; }
 
-.hero h1 { font-weight: 760; letter-spacing: -.075em; }
+.hero h1 { font-weight: 760; letter-spacing: -.065em; }
 .hero p { font-weight: 400; }
 .hero .primary { box-shadow: 0 12px 26px rgba(0,0,0,.14); }
 
