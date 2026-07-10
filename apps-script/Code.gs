@@ -6,13 +6,22 @@ const SHEET_GIDS = {
   'Cambio de aceite': 464443967
 };
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === 'migrateAlertsNow') {
+    return jsonResponse({ ok: true, message: migrateAlertsNow() });
+  }
   return jsonResponse({ ok: true, message: 'Punto PAS API activa' });
 }
 
 function authorizeExternalRequest() {
   const response = UrlFetchApp.fetch('https://www.googleapis.com/discovery/v1/apis');
   return response.getResponseCode();
+}
+
+function migrateAlertsNow() {
+  const sheet = getOrCreateAlertsSheet();
+  backfillAlertMileageAndHours(sheet);
+  return 'ALERTAS ACEITE actualizada';
 }
 
 function doPost(e) {
@@ -279,7 +288,48 @@ function getOrCreateAlertsSheet() {
       sheet.getRange(1, 8, 1, 2).setValues([['KILOMETRAJE', 'HOROMETRO']]);
     }
   }
+  backfillAlertMileageAndHours(sheet);
   return sheet;
+}
+
+function backfillAlertMileageAndHours(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const lastColumn = Math.max(sheet.getLastColumn(), 11);
+  const values = sheet.getRange(1, 1, lastRow, lastColumn).getValues();
+  const headers = values[0];
+
+  if (headers[7] !== 'KILOMETRAJE' || headers[8] !== 'HOROMETRO') return;
+
+  const groups = {};
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const placa = String(row[0] || '').toUpperCase();
+    const type = String(row[1] || '').toUpperCase();
+    if (!placa || (type !== 'KM' && type !== 'HORAS')) continue;
+
+    const key = placa + '|' + String(row[10] || '');
+    groups[key] = groups[key] || { km: '', hours: '' };
+    if (type === 'KM') groups[key].km = Number(row[2] || 0);
+    if (type === 'HORAS') groups[key].hours = Number(row[2] || 0);
+  }
+
+  const updates = [];
+  let hasChanges = false;
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const placa = String(row[0] || '').toUpperCase();
+    const type = String(row[1] || '').toUpperCase();
+    const key = placa + '|' + String(row[10] || '');
+    const group = groups[key] || {};
+    const km = group.km || (type === 'KM' ? Number(row[2] || 0) : row[7] || '');
+    const hours = group.hours || (type === 'HORAS' ? Number(row[2] || 0) : row[8] || '');
+    updates.push([km, hours]);
+    if (row[7] !== km || row[8] !== hours) hasChanges = true;
+  }
+
+  if (hasChanges) sheet.getRange(2, 8, updates.length, 2).setValues(updates);
 }
 
 function getSheetByGid(gid) {
