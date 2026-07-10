@@ -65,6 +65,10 @@ type VehicleRecord = {
   kilometrajeFinal?: number;
   sumaKilometraje?: number;
   transporte?: 'GRANDE' | 'PEQUENO' | '';
+  alertaKm?: string;
+  alertaHoras?: string;
+  tipoAlerta?: string;
+  estadoAlerta?: string;
 };
 
 type Filters = {
@@ -170,6 +174,10 @@ async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
     horometroActual: service === 'Cambio de aceite' ? parseNumber(row[14]) : 0,
     horasTrabajadas: service === 'Cambio de aceite' ? parseNumber(row[15]) || Math.max(0, parseNumber(row[14]) - parseNumber(row[13])) : 0,
     cambioAceite: service === 'Cambio de aceite' ? (String(row[16] ?? '').toUpperCase() === 'SI' ? 'SI' : 'NO') : '',
+    alertaKm: service === 'Cambio de aceite' ? String(row[17] ?? '') : '',
+    alertaHoras: service === 'Cambio de aceite' ? String(row[18] ?? '') : '',
+    tipoAlerta: service === 'Cambio de aceite' ? String(row[19] ?? '') : '',
+    estadoAlerta: service === 'Cambio de aceite' ? String(row[20] ?? '') : '',
   }));
 }
 
@@ -298,7 +306,7 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
   const visible = sorted.slice((page - 1) * pageSize, page * pageSize);
   const total = records.reduce((sum, record) => sum + record.cantidadPago, 0);
   const isOilChange = service === 'Cambio de aceite';
-  const tableKeys = isOilChange ? ['fecha', 'placa', 'transporte', 'chofer', 'kilometrajeInicial', 'kilometrajeFinal', 'sumaKilometraje', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'cantidadPago', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
+  const tableKeys = isOilChange ? ['fecha', 'placa', 'transporte', 'chofer', 'kilometrajeInicial', 'kilometrajeFinal', 'sumaKilometraje', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'alertaKm', 'alertaHoras', 'tipoAlerta', 'estadoAlerta', 'cantidadPago', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
 
   useEffect(() => setPage(1), [records.length]);
 
@@ -316,10 +324,10 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
           <tbody>
             {visible.map((record, index) => (
               <tr key={`${record.tipoServicio}-${record.item}-${index}`}>
-                {isOilChange ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Transporte">{record.transporte || 'GRANDE'}</td><td data-label="Chofer">{record.chofer}</td><td data-label="Km inicial">{record.kilometrajeInicial || 0}</td><td data-label="Km final">{record.kilometrajeFinal || 0}</td><td data-label="Suma kilometraje">{record.sumaKilometraje || 0}</td><td data-label="Horometro inicial">{record.horometroAnterior || 0}</td><td data-label="Horometro final">{record.horometroActual || 0}</td><td data-label="Horas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
+                {isOilChange ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Transporte">{record.transporte || 'GRANDE'}</td><td data-label="Chofer">{record.chofer}</td><td data-label="Km inicial">{record.kilometrajeInicial || 0}</td><td data-label="Km final">{record.kilometrajeFinal || 0}</td><td data-label="Suma kilometraje">{record.sumaKilometraje || 0}</td><td data-label="Horometro inicial">{record.horometroAnterior || 0}</td><td data-label="Horometro final">{record.horometroActual || 0}</td><td data-label="Horas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Alerta KM">{record.alertaKm || 'NO'}</td><td data-label="Alerta horas">{record.alertaHoras || 'NO'}</td><td data-label="Tipo alerta">{record.tipoAlerta || ''}</td><td data-label="Estado alerta">{record.estadoAlerta || ''}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
               </tr>
             ))}
-            {!visible.length && <tr><td colSpan={isOilChange ? 13 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
+            {!visible.length && <tr><td colSpan={isOilChange ? 17 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -329,7 +337,7 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
 }
 
 function labelFor(key: string) {
-  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', transporte: 'Transporte', horometroAnterior: 'Horometro inicial', horometroActual: 'Horometro final', horasTrabajadas: 'Horas', cambioAceite: 'Cambio aceite?', kilometrajeInicial: 'Km inicial', kilometrajeFinal: 'Km final', sumaKilometraje: 'Suma kilometraje' } as Record<string, string>)[key] || key;
+  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', transporte: 'Transporte', horometroAnterior: 'Horometro inicial', horometroActual: 'Horometro final', horasTrabajadas: 'Horas', cambioAceite: 'Cambio aceite?', kilometrajeInicial: 'Km inicial', kilometrajeFinal: 'Km final', sumaKilometraje: 'Suma kilometraje', alertaKm: 'Alerta KM', alertaHoras: 'Alerta horas', tipoAlerta: 'Tipo alerta', estadoAlerta: 'Estado alerta' } as Record<string, string>)[key] || key;
 }
 
 function ExportButtons({ records, title, filters, service }: { records: VehicleRecord[]; title: string; filters: Filters; service?: ServiceName }) {
