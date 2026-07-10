@@ -44,7 +44,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import './styles.css';
 
-type ServiceName = 'Mantenimiento' | 'Lavado' | 'Engrasada' | 'Cambio de aceite' | 'Control horometro';
+type ServiceName = 'Mantenimiento' | 'Lavado' | 'Engrasada' | 'Cambio de aceite';
 
 type VehicleRecord = {
   item: string;
@@ -64,6 +64,7 @@ type VehicleRecord = {
   kilometrajeInicial?: number;
   kilometrajeFinal?: number;
   sumaKilometraje?: number;
+  transporte?: 'GRANDE' | 'PEQUENO' | '';
 };
 
 type Filters = {
@@ -77,31 +78,28 @@ type FormState = Omit<VehicleRecord, 'item' | 'cantidadPago'> & { cantidadPago: 
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID || '1Evr1lpNSwLYXWgcRf5D5NSPUD5nR-YS_EczVK4PVAHI';
 const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyO36x93npGUiOrJP27s1Zdryp7E2E1rb8ak_CrAf3QRgPn05lN2H4k2jocWkQewmsB0w/exec';
 
-const SERVICES: ServiceName[] = ['Mantenimiento', 'Lavado', 'Engrasada', 'Cambio de aceite', 'Control horometro'];
-const COLORS = ['#ff0000', '#25ff00', '#111827', '#9ca3af', '#f59e0b'];
+const SERVICES: ServiceName[] = ['Mantenimiento', 'Lavado', 'Engrasada', 'Cambio de aceite'];
+const COLORS = ['#ff0000', '#25ff00', '#111827', '#9ca3af'];
 const HEADERS = ['ITEM', 'FECHA', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
 const SHEET_GIDS: Record<ServiceName, string> = {
   Mantenimiento: '0',
   Lavado: '819388144',
   Engrasada: '2024356449',
   'Cambio de aceite': '464443967',
-  'Control horometro': '',
 };
 
 const serviceMeta: Record<ServiceName, { icon: React.ElementType; accent: string; description: string }> = {
   Mantenimiento: { icon: Wrench, accent: 'red', description: 'Servicios correctivos y preventivos' },
   Lavado: { icon: Droplets, accent: 'green', description: 'Control de limpiezas vehiculares' },
   Engrasada: { icon: Gauge, accent: 'dark', description: 'Lubricacion y proteccion mecanica' },
-  'Cambio de aceite': { icon: Bike, accent: 'gray', description: 'Registros de aceite y filtros' },
-  'Control horometro': { icon: Gauge, accent: 'orange', description: 'Horas acumuladas y alertas de aceite' },
+  'Cambio de aceite': { icon: Bike, accent: 'gray', description: 'Kilometraje, horometro y alertas de aceite' },
 };
 
 const mockData: VehicleRecord[] = [
   { item: '1', fecha: '2026-06-02', lugar: 'Santo Domingo', maestro: 'Carlos Diaz', taller: 'Taller Central', chofer: 'Luis Perez', placa: 'PAS-104', cantidadPago: 4200, descripcion: 'Revision general de frenos', tipoServicio: 'Mantenimiento' },
   { item: '2', fecha: '2026-06-05', lugar: 'La Vega', maestro: 'Ramon Cruz', taller: 'PAS Norte', chofer: 'Ana Gomez', placa: 'PAS-220', cantidadPago: 850, descripcion: 'Lavado completo', tipoServicio: 'Lavado' },
   { item: '3', fecha: '2026-06-08', lugar: 'Santiago', maestro: 'Miguel Soto', taller: 'LubriExpress', chofer: 'Jose Rivas', placa: 'PAS-104', cantidadPago: 1450, descripcion: 'Engrasada tren delantero', tipoServicio: 'Engrasada' },
-  { item: '4', fecha: '2026-06-12', lugar: 'Distrito Nacional', maestro: 'Pedro Leon', taller: 'AutoServicio PAS', chofer: 'Marta Gil', placa: 'PAS-308', cantidadPago: 3650, descripcion: 'Cambio aceite 15W40', tipoServicio: 'Cambio de aceite' },
-  { item: '5', fecha: '2026-06-15', lugar: '', maestro: '', taller: '', chofer: 'Luis Perez', placa: 'PAS-104', cantidadPago: 0, descripcion: 'Jornada de maquinaria', tipoServicio: 'Control horometro', horometroAnterior: 1000, horometroActual: 1120, horasTrabajadas: 120, cambioAceite: 'NO' },
+  { item: '4', fecha: '2026-06-12', lugar: 'Distrito Nacional', maestro: 'Pedro Leon', taller: 'AutoServicio PAS', chofer: 'Marta Gil', placa: 'PAS-308', cantidadPago: 3650, descripcion: 'Cambio aceite 15W40', tipoServicio: 'Cambio de aceite', transporte: 'GRANDE', kilometrajeInicial: 0, kilometrajeFinal: 1200, sumaKilometraje: 1200, horometroAnterior: 0, horometroActual: 40, horasTrabajadas: 40, cambioAceite: 'NO' },
 ];
 
 const emptyFilters: Filters = { placa: '', desde: '', hasta: '' };
@@ -122,6 +120,7 @@ const emptyForm: FormState = {
   kilometrajeInicial: 0,
   kilometrajeFinal: 0,
   sumaKilometraje: 0,
+  transporte: 'GRANDE',
 };
 
 function money(value: number) {
@@ -147,35 +146,11 @@ function parseGviz(text: string): unknown[][] {
 }
 
 async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
-  const source = SHEET_GIDS[service] ? `gid=${SHEET_GIDS[service]}` : `sheet=${encodeURIComponent('CONTROL HOROMETRO')}`;
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&${source}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GIDS[service]}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`No se pudo consultar ${service}`);
   const rows = parseGviz(await response.text());
   const dataRows = rows.filter((row) => String(row[0]).toUpperCase() !== 'ITEM' && row.some(Boolean));
-  if (service === 'Control horometro') {
-    return dataRows.map((row) => {
-      const anterior = parseNumber(row[5]);
-      const actual = parseNumber(row[6]);
-      const horas = Math.max(0, actual - anterior);
-      return {
-        item: String(row[0] ?? ''),
-        fecha: normalizeDate(String(row[1] ?? '')),
-        lugar: String(row[2] ?? ''),
-        maestro: '',
-        taller: '',
-        chofer: String(row[3] ?? ''),
-        placa: String(row[4] ?? '').toUpperCase(),
-        cantidadPago: 0,
-        descripcion: String(row[7] ?? ''),
-        tipoServicio: service,
-        horometroAnterior: anterior,
-        horometroActual: actual,
-        horasTrabajadas: horas,
-        cambioAceite: String(row[8] ?? '').toUpperCase() === 'SI' ? 'SI' : 'NO',
-      };
-    });
-  }
   return dataRows.map((row) => ({
     item: String(row[0] ?? ''),
     fecha: normalizeDate(String(row[1] ?? '')),
@@ -190,6 +165,11 @@ async function fetchSheet(service: ServiceName): Promise<VehicleRecord[]> {
     kilometrajeInicial: service === 'Cambio de aceite' ? parseNumber(row[9]) : 0,
     kilometrajeFinal: service === 'Cambio de aceite' ? parseNumber(row[10]) : 0,
     sumaKilometraje: service === 'Cambio de aceite' ? parseNumber(row[11]) : 0,
+    transporte: service === 'Cambio de aceite' ? (String(row[12] ?? '').toUpperCase().includes('PEQUE') ? 'PEQUENO' : 'GRANDE') : '',
+    horometroAnterior: service === 'Cambio de aceite' ? parseNumber(row[13]) : 0,
+    horometroActual: service === 'Cambio de aceite' ? parseNumber(row[14]) : 0,
+    horasTrabajadas: service === 'Cambio de aceite' ? parseNumber(row[15]) || Math.max(0, parseNumber(row[14]) - parseNumber(row[13])) : 0,
+    cambioAceite: service === 'Cambio de aceite' ? (String(row[16] ?? '').toUpperCase() === 'SI' ? 'SI' : 'NO') : '',
   }));
 }
 
@@ -291,14 +271,13 @@ function ServiceCard({ service, records, onOpen }: { service: ServiceName; recor
   const meta = serviceMeta[service];
   const Icon = meta.icon;
   const total = records.reduce((sum, record) => sum + record.cantidadPago, 0);
-  const totalHours = records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0);
   const last = [...records].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   return (
     <motion.article whileHover={{ y: -5 }} className={`service-card ${meta.accent}`}>
       <div className="service-head"><div className="service-icon"><Icon size={28} /></div><span>{records.length} registros</span></div>
       <h3>{service.toUpperCase()}</h3>
       <p>{meta.description}</p>
-      <div className="service-stats"><strong>{service === 'Control horometro' ? `${totalHours} horas` : money(total)}</strong><small>Ultimo: {last ? `${last.fecha} - ${last.placa}` : 'Sin registros'}</small></div>
+      <div className="service-stats"><strong>{money(total)}</strong><small>Ultimo: {last ? `${last.fecha} - ${last.placa}` : 'Sin registros'}</small></div>
       <button className="secondary" onClick={onOpen}>Ingresar al modulo</button>
     </motion.article>
   );
@@ -318,9 +297,8 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const visible = sorted.slice((page - 1) * pageSize, page * pageSize);
   const total = records.reduce((sum, record) => sum + record.cantidadPago, 0);
-  const isHourMeter = service === 'Control horometro';
   const isOilChange = service === 'Cambio de aceite';
-  const tableKeys = isHourMeter ? ['fecha', 'placa', 'chofer', 'lugar', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'descripcion'] : isOilChange ? ['fecha', 'placa', 'chofer', 'taller', 'lugar', 'kilometrajeInicial', 'kilometrajeFinal', 'sumaKilometraje', 'cantidadPago', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
+  const tableKeys = isOilChange ? ['fecha', 'placa', 'transporte', 'chofer', 'kilometrajeInicial', 'kilometrajeFinal', 'sumaKilometraje', 'horometroAnterior', 'horometroActual', 'horasTrabajadas', 'cambioAceite', 'cantidadPago', 'descripcion'] : ['fecha', 'tipoServicio', 'placa', 'chofer', 'taller', 'lugar', 'cantidadPago', 'descripcion'];
 
   useEffect(() => setPage(1), [records.length]);
 
@@ -331,17 +309,17 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
 
   return (
     <section className="table-card">
-      <div className="table-toolbar"><div><h2>{title}</h2><p>{records.length} registros filtrados · {isHourMeter ? `${records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0)} horas acumuladas` : `Total ${money(total)}`}</p></div><ExportButtons records={records} title={title} filters={filters} service={service} /></div>
+      <div className="table-toolbar"><div><h2>{title}</h2><p>{records.length} registros filtrados · Total {money(total)}</p></div><ExportButtons records={records} title={title} filters={filters} service={service} /></div>
       <div className="table-wrap">
         <table>
           <thead><tr>{tableKeys.map((key) => <th key={key} onClick={() => setSort(key as keyof VehicleRecord)}>{labelFor(key)} {sortKey === key ? (direction === 'asc' ? '↑' : '↓') : ''}</th>)}</tr></thead>
           <tbody>
             {visible.map((record, index) => (
               <tr key={`${record.tipoServicio}-${record.item}-${index}`}>
-                {isHourMeter ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Horometro anterior">{record.horometroAnterior || 0}</td><td data-label="Horometro actual">{record.horometroActual || 0}</td><td data-label="Horas trabajadas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Descripcion">{record.descripcion}</td></> : isOilChange ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Km inicial">{record.kilometrajeInicial || 0}</td><td data-label="Km final">{record.kilometrajeFinal || 0}</td><td data-label="Suma kilometraje">{record.sumaKilometraje || 0}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
+                {isOilChange ? <><td data-label="Fecha">{record.fecha}</td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Transporte">{record.transporte || 'GRANDE'}</td><td data-label="Chofer">{record.chofer}</td><td data-label="Km inicial">{record.kilometrajeInicial || 0}</td><td data-label="Km final">{record.kilometrajeFinal || 0}</td><td data-label="Suma kilometraje">{record.sumaKilometraje || 0}</td><td data-label="Horometro inicial">{record.horometroAnterior || 0}</td><td data-label="Horometro final">{record.horometroActual || 0}</td><td data-label="Horas">{record.horasTrabajadas || 0}</td><td data-label="Cambio aceite"><span className={`pill ${record.cambioAceite === 'NO' ? 'danger' : 'ok'}`}>{record.cambioAceite || 'NO'}</span></td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></> : <><td data-label="Fecha">{record.fecha}</td><td data-label="Servicio"><span className="pill">{record.tipoServicio}</span></td><td data-label="Placa"><strong>{record.placa}</strong></td><td data-label="Chofer">{record.chofer}</td><td data-label="Taller">{record.taller}</td><td data-label="Lugar">{record.lugar}</td><td data-label="Pago">{money(record.cantidadPago)}</td><td data-label="Descripcion">{record.descripcion}</td></>}
               </tr>
             ))}
-            {!visible.length && <tr><td colSpan={isHourMeter ? 9 : isOilChange ? 10 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
+            {!visible.length && <tr><td colSpan={isOilChange ? 13 : 8} className="empty">No hay registros para los filtros seleccionados.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -351,26 +329,14 @@ function DataTable({ records, title, filters, service }: { records: VehicleRecor
 }
 
 function labelFor(key: string) {
-  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', horometroAnterior: 'Horometro anterior', horometroActual: 'Horometro actual', horasTrabajadas: 'Horas trabajadas', cambioAceite: 'Cambio aceite?', kilometrajeInicial: 'Km inicial', kilometrajeFinal: 'Km final', sumaKilometraje: 'Suma kilometraje' } as Record<string, string>)[key] || key;
+  return ({ fecha: 'Fecha', tipoServicio: 'Servicio', placa: 'Placa', chofer: 'Chofer', taller: 'Taller', lugar: 'Lugar', cantidadPago: 'Pago', descripcion: 'Descripcion', transporte: 'Transporte', horometroAnterior: 'Horometro inicial', horometroActual: 'Horometro final', horasTrabajadas: 'Horas', cambioAceite: 'Cambio aceite?', kilometrajeInicial: 'Km inicial', kilometrajeFinal: 'Km final', sumaKilometraje: 'Suma kilometraje' } as Record<string, string>)[key] || key;
 }
 
 function ExportButtons({ records, title, filters, service }: { records: VehicleRecord[]; title: string; filters: Filters; service?: ServiceName }) {
   function excel() {
-    const isHourMeter = service === 'Control horometro';
     const isOilChange = service === 'Cambio de aceite';
-    const header = isHourMeter ? ['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'HOROMETRO ANTERIOR', 'HOROMETRO ACTUAL', 'HORAS TRABAJADAS', 'PLACA', 'CAMBIO DE ACEITE?', 'DESCRIPCION'] : isOilChange ? ['ITEM', 'FECHA', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION', 'KILOMETRAJE INICIAL', 'KILOMETRAJE FINAL', 'SUMA KILOMETRAJE'] : ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
-    const body = records.map((record, index) => isHourMeter ? [
-      record.item || String(index + 1),
-      record.fecha,
-      record.lugar,
-      record.chofer,
-      record.horometroAnterior || 0,
-      record.horometroActual || 0,
-      record.horasTrabajadas || 0,
-      record.placa,
-      record.cambioAceite || 'NO',
-      record.descripcion,
-    ] : isOilChange ? [
+    const header = isOilChange ? ['ITEM', 'FECHA', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION', 'KILOMETRAJE INICIAL', 'KILOMETRAJE FINAL', 'SUMA KILOMETRAJE', 'TRANSPORTE', 'HOROMETRO INICIAL', 'HOROMETRO FINAL', 'HORAS', 'CAMBIO DE ACEITE'] : ['ITEM', 'FECHA', 'SERVICIO', 'LUGAR', 'MAESTRO', 'TALLER', 'CHOFER', 'PLACA', 'CANTIDAD DE PAGO', 'DESCRIPCION'];
+    const body = records.map((record, index) => isOilChange ? [
       record.item || String(index + 1),
       record.fecha,
       record.lugar,
@@ -383,6 +349,11 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       record.kilometrajeInicial || 0,
       record.kilometrajeFinal || 0,
       record.sumaKilometraje || 0,
+      record.transporte || 'GRANDE',
+      record.horometroAnterior || 0,
+      record.horometroActual || 0,
+      record.horasTrabajadas || 0,
+      record.cambioAceite || 'NO',
     ] : [
       record.item || String(index + 1),
       record.fecha,
@@ -404,13 +375,13 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       header,
       ...body,
       [],
-      isHourMeter ? ['', '', '', '', '', 'TOTAL HORAS', records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0), '', '', ''] : isOilChange ? ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), '', 'TOTAL KM', records.reduce((sum, record) => sum + (record.kilometrajeFinal || 0) - (record.kilometrajeInicial || 0), 0)] : ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
+      isOilChange ? ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), '', 'TOTAL KM', records.reduce((sum, record) => sum + (record.kilometrajeFinal || 0) - (record.kilometrajeInicial || 0), 0), '', '', '', 'TOTAL HORAS', records.reduce((sum, record) => sum + (record.horasTrabajadas || 0), 0), ''] : ['', '', '', '', '', '', '', 'TOTAL', records.reduce((sum, record) => sum + record.cantidadPago, 0), ''],
     ]);
     ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: isOilChange ? 11 : 9 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: isOilChange ? 11 : 9 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: isOilChange ? 11 : 9 } },
-      { s: { r: 3, c: 0 }, e: { r: 3, c: isOilChange ? 11 : 9 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: isOilChange ? 16 : 9 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: isOilChange ? 16 : 9 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: isOilChange ? 16 : 9 } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: isOilChange ? 16 : 9 } },
     ];
     ws['!cols'] = [
       { wch: 10 },
@@ -424,13 +395,12 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
       { wch: 20 },
       { wch: 45 },
     ];
-    ws['!autofilter'] = { ref: `A6:${isOilChange ? 'L' : 'J'}${Math.max(6, body.length + 6)}` };
+    ws['!autofilter'] = { ref: `A6:${isOilChange ? 'Q' : 'J'}${Math.max(6, body.length + 6)}` };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
     XLSX.writeFile(wb, `${title.replace(/\s+/g, '_')}.xlsx`);
   }
   function pdf() {
-    const isHourMeter = service === 'Control horometro';
     const isOilChange = service === 'Cambio de aceite';
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFillColor(255, 0, 0); doc.rect(10, 10, 12, 12, 'F');
@@ -438,7 +408,7 @@ function ExportButtons({ records, title, filters, service }: { records: VehicleR
     doc.setFontSize(16); doc.text('Distribuidor Punto PAS', 40, 16);
     doc.setFontSize(11); doc.text(title, 40, 23);
     doc.text(`Generado: ${new Date().toLocaleString('es-DO')} | Placa: ${filters.placa || 'Todas'} | Servicio: ${service || 'Todos'}`, 10, 34);
-    autoTable(doc, { startY: 40, head: [isHourMeter ? ['Fecha', 'Placa', 'Chofer', 'Lugar', 'Anterior', 'Actual', 'Horas', 'Cambio aceite', 'Descripcion'] : isOilChange ? ['Fecha', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Km inicial', 'Km final', 'Suma km', 'Pago', 'Descripcion'] : ['Fecha', 'Servicio', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Pago', 'Descripcion']], body: isHourMeter ? records.map((r) => [r.fecha, r.placa, r.chofer, r.lugar, r.horometroAnterior || 0, r.horometroActual || 0, r.horasTrabajadas || 0, r.cambioAceite || 'NO', r.descripcion]) : isOilChange ? records.map((r) => [r.fecha, r.placa, r.chofer, r.taller, r.lugar, r.kilometrajeInicial || 0, r.kilometrajeFinal || 0, r.sumaKilometraje || 0, money(r.cantidadPago), r.descripcion]) : records.map((r) => [r.fecha, r.tipoServicio, r.placa, r.chofer, r.taller, r.lugar, money(r.cantidadPago), r.descripcion]), styles: { fontSize: 8 }, headStyles: { fillColor: [255, 0, 0] } });
+    autoTable(doc, { startY: 40, head: [isOilChange ? ['Fecha', 'Placa', 'Transporte', 'Km inicial', 'Km final', 'Suma km', 'H inicial', 'H final', 'Horas', 'Cambio aceite', 'Pago'] : ['Fecha', 'Servicio', 'Placa', 'Chofer', 'Taller', 'Lugar', 'Pago', 'Descripcion']], body: isOilChange ? records.map((r) => [r.fecha, r.placa, r.transporte || 'GRANDE', r.kilometrajeInicial || 0, r.kilometrajeFinal || 0, r.sumaKilometraje || 0, r.horometroAnterior || 0, r.horometroActual || 0, r.horasTrabajadas || 0, r.cambioAceite || 'NO', money(r.cantidadPago)]) : records.map((r) => [r.fecha, r.tipoServicio, r.placa, r.chofer, r.taller, r.lugar, money(r.cantidadPago), r.descripcion]), styles: { fontSize: 8 }, headStyles: { fillColor: [255, 0, 0] } });
     doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
   }
   return <div className="export-actions"><button className="secondary" onClick={excel}><FileSpreadsheet size={16} /> Excel</button><button className="secondary" onClick={pdf}><FileText size={16} /> PDF</button></div>;
@@ -460,7 +430,7 @@ function RecordModal({ open, records, onClose, onSaved }: { open: boolean; recor
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const isHourMeter = form.tipoServicio === 'Control horometro';
+  const isHourMeter = false;
   const isOilChange = form.tipoServicio === 'Cambio de aceite';
   const calculatedHours = Math.max(0, Number(form.horometroActual || 0) - Number(form.horometroAnterior || 0));
   const calculatedKm = Math.max(0, Number(form.kilometrajeFinal || 0) - Number(form.kilometrajeInicial || 0));
@@ -473,7 +443,7 @@ function RecordModal({ open, records, onClose, onSaved }: { open: boolean; recor
   async function confirmSave() {
     setSaving(true); setStatus('');
     try {
-      const payload = isHourMeter ? { ...form, horasTrabajadas: calculatedHours, cantidadPago: '0' } : isOilChange ? { ...form, sumaKilometraje: totalKm } : form;
+      const payload = isOilChange ? { ...form, sumaKilometraje: totalKm, horasTrabajadas: calculatedHours } : form;
       await addRecord(payload);
       const record: VehicleRecord = { ...payload, item: String(Date.now()), cantidadPago: Number(payload.cantidadPago) || 0, placa: payload.placa.toUpperCase(), horometroAnterior: Number(payload.horometroAnterior || 0), horometroActual: Number(payload.horometroActual || 0), horasTrabajadas: Number(payload.horasTrabajadas || 0), cambioAceite: payload.cambioAceite, kilometrajeInicial: Number(payload.kilometrajeInicial || 0), kilometrajeFinal: Number(payload.kilometrajeFinal || 0), sumaKilometraje: Number(payload.sumaKilometraje || 0) };
       onSaved(record);
@@ -492,8 +462,8 @@ function Field({ label, value, onChange, type = 'text' }: { label: string; value
   return <label>{label}<input required type={type} value={value} onChange={(e) => onChange(e.target.value)} /></label>;
 }
 
-function getHourMeterAlerts(records: VehicleRecord[]) {
-  const byPlate = records.filter((record) => record.tipoServicio === 'Control horometro').reduce((acc, record) => {
+function getOilAlerts(records: VehicleRecord[]) {
+  const byPlate = records.filter((record) => record.tipoServicio === 'Cambio de aceite').reduce((acc, record) => {
     acc[record.placa] = acc[record.placa] || [];
     acc[record.placa].push(record);
     return acc;
@@ -501,20 +471,26 @@ function getHourMeterAlerts(records: VehicleRecord[]) {
   return Object.entries(byPlate).map(([placa, plateRecords]) => {
     const sorted = [...plateRecords].sort((a, b) => a.fecha.localeCompare(b.fecha));
     let hours = 0;
+    let km = 0;
+    let transporte: VehicleRecord['transporte'] = 'GRANDE';
     let lastDate = '';
     sorted.forEach((record) => {
       lastDate = record.fecha || lastDate;
-      if (record.cambioAceite === 'SI') hours = 0;
-      else hours += record.horasTrabajadas || 0;
+      transporte = record.transporte || transporte;
+      if (record.cambioAceite === 'SI') { hours = 0; km = 0; }
+      else {
+        hours += record.horasTrabajadas || 0;
+        km += Math.max(0, (record.kilometrajeFinal || 0) - (record.kilometrajeInicial || 0));
+      }
     });
-    return { placa, hours, lastDate };
-  }).filter((alert) => alert.hours >= 250);
+    const kmLimit = String(transporte) === 'PEQUENO' ? 5000 : 10000;
+    return { placa, hours, km, kmLimit, lastDate };
+  }).filter((alert) => alert.hours >= 250 || alert.km >= alert.kmLimit);
 }
 
-function HourMeterAlerts({ alerts }: { alerts: Array<{ placa: string; hours: number; lastDate: string }> }) {
+function HourMeterAlerts({ alerts }: { alerts: Array<{ placa: string; hours: number; km: number; kmLimit: number; lastDate: string }> }) {
   if (!alerts.length) return null;
-  const phones = ['593939069555', '593997882191'];
-  return <section className="alert-panel"><div><span className="eyebrow"><MessageCircle size={16} /> Alerta WhatsApp</span><h2>Vehiculos con 250 horas o mas sin cambio de aceite</h2><p>La web deja listo el aviso por WhatsApp. Para envio totalmente automatico se debe conectar una API oficial de WhatsApp Business o Twilio.</p></div>{alerts.map((alert) => <div className="alert-row" key={alert.placa}><strong>{alert.placa}</strong><span>{alert.hours} horas acumuladas desde el ultimo cambio</span><div className="export-actions">{phones.map((phone) => <a className="secondary" key={phone} href={`https://wa.me/${phone}?text=${encodeURIComponent(`ALERTA PUNTO PAS: La placa ${alert.placa} tiene ${alert.hours} horas acumuladas sin cambio de aceite. Ultimo registro: ${alert.lastDate}.`)}`} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Avisar {phone}</a>)}</div></div>)}</section>;
+  return <section className="alert-panel"><div><span className="eyebrow"><MessageCircle size={16} /> Alerta WhatsApp</span><h2>Vehiculos que requieren cambio de aceite</h2><p>Alertas por kilometraje acumulado o por 250 horas de horometro.</p></div>{alerts.map((alert) => <div className="alert-row" key={alert.placa}><strong>{alert.placa}</strong><span>{alert.km} km / {alert.hours} horas desde el ultimo cambio</span></div>)}</section>;
 }
 
 function serviceFromPath() {
@@ -589,15 +565,15 @@ function Dashboard() {
   const byPlate = Object.entries(filtered.reduce((acc, r) => { acc[r.placa] = (acc[r.placa] || 0) + r.cantidadPago; return acc; }, {} as Record<string, number>)).sort((a, b) => b[1] - a[1]);
   const last = [...filtered].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   const avgByVehicle = byPlate.length ? totalPaid / byPlate.length : 0;
-  const hourMeterAlerts = getHourMeterAlerts(filtered);
+  const hourMeterAlerts = getOilAlerts(filtered);
 
   async function configureWhatsApp() {
     const phoneNumberId = window.prompt('WHATSAPP_PHONE_NUMBER_ID', '1246003585254432');
     if (!phoneNumberId) return;
     const accessToken = window.prompt('WHATSAPP_ACCESS_TOKEN');
     if (!accessToken) return;
-    const templateName = window.prompt('WHATSAPP_TEMPLATE_NAME', 'jaspers_market_order_confirmation_v1') || 'jaspers_market_order_confirmation_v1';
-    const languageCode = window.prompt('WHATSAPP_LANGUAGE_CODE', 'en_US') || 'en_US';
+    const templateName = window.prompt('WHATSAPP_TEMPLATE_NAME', 'alerta_horometro') || 'alerta_horometro';
+    const languageCode = window.prompt('WHATSAPP_LANGUAGE_CODE', 'es_EC') || 'es_EC';
     try {
       await saveWhatsAppConfig({ phoneNumberId, accessToken, templateName, languageCode });
       window.alert('WhatsApp configurado correctamente. Publica una nueva version del Apps Script si acabas de actualizar el codigo.');
@@ -608,7 +584,7 @@ function Dashboard() {
 
   function logout() { sessionStorage.removeItem('punto-pas-session'); window.location.reload(); }
 
-  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={configureWhatsApp}><MessageCircle size={16} /> Configurar WhatsApp</button><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={service === 'Control horometro' ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} records={records} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
+  return <><header className="topbar"><Logo /><div className="top-meta"><span>Maria21</span><span>{new Date().toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><button className="ghost" onClick={configureWhatsApp}><MessageCircle size={16} /> Configurar WhatsApp</button><button className="ghost" onClick={() => setNightMode((value) => !value)}>{nightMode ? <Sun size={16} /> : <Moon size={16} />} {nightMode ? 'Vision diurna' : 'Vision nocturna'}</button><button className="ghost" onClick={logout}><LogOut size={16} /> Cerrar sesion</button></div></header><main className="page"><section className="hero"><div><span className="eyebrow"><Sparkles size={16} /> Dashboard ejecutivo</span><h1>REGISTRO DE MANTENIMIENTO VEHICULO Y MAQUINARIA</h1><p>Vista centralizada de servicios, costos, placas, tendencias y reportes para Distribuidor Punto PAS.</p></div><button className="primary" onClick={() => setModalOpen(true)}><Plus size={18} /> Agregar registro</button></section>{notice && <div className="alert error">{notice}</div>}{loading && <div className="alert success">Cargando informacion desde Google Sheets...</div>}<FilterBar filters={filters} setFilters={setFilters} onClear={() => setFilters(emptyFilters)} /><HourMeterAlerts alerts={hourMeterAlerts} /><section className="summary-grid"><SummaryCard title="Total registros" value={String(filtered.length)} hint="Servicios encontrados" icon={ClipboardList} /><SummaryCard title="Total pagado" value={money(totalPaid)} hint="Segun filtros aplicados" icon={Download} /><SummaryCard title="Vehiculo mayor gasto" value={byPlate[0]?.[0] || 'N/A'} hint={byPlate[0] ? money(byPlate[0][1]) : 'Sin datos'} icon={Car} /><SummaryCard title="Promedio por vehiculo" value={money(avgByVehicle)} hint="Costo operacional medio" icon={BarChart3} /></section><section className="service-grid">{SERVICES.map((service) => <ServiceCard key={service} service={service} records={filtered.filter((r) => r.tipoServicio === service)} onOpen={() => setActiveService(service)} />)}</section><section className="summary-grid narrow">{SERVICES.map((service) => <SummaryCard key={service} title={`Total ${service.toLowerCase()}`} value={String(filtered.filter((r) => r.tipoServicio === service).length)} hint={false ? `${filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + (r.horasTrabajadas || 0), 0)} horas` : money(filtered.filter((r) => r.tipoServicio === service).reduce((s, r) => s + r.cantidadPago, 0))} icon={serviceMeta[service].icon} />)}<SummaryCard title="Ultimo servicio" value={last?.placa || 'N/A'} hint={last ? `${last.tipoServicio} · ${last.fecha}` : 'Sin registros'} icon={CalendarDays} /></section><Charts records={filtered} />{filters.placa && <DataTable records={filtered} title={`Consulta general por placa ${filters.placa.toUpperCase()}`} filters={filters} />}{!filters.placa && <DataTable records={filtered} title="Tabla general de servicios" filters={filters} />}</main><RecordModal open={modalOpen} records={records} onClose={() => setModalOpen(false)} onSaved={(record) => setRecords((current) => [record, ...current])} /><button className="fab" onClick={() => setModalOpen(true)}><Plus /></button></>;
 }
 
 function App() {

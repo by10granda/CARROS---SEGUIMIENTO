@@ -42,22 +42,20 @@ La app usa estas pestañas del mismo archivo:
 - Lavado: `gid=819388144`
 - Engrasada: `gid=2024356449`
 - Cambio de aceite: `gid=464443967`
-- Control horometro: pestaña `CONTROL HOROMETRO`
 
-## Control horometro
+## Cambio de aceite
 
-El modulo `Control horometro` usa columnas propias:
+El modulo `Cambio de aceite` concentra tambien el control de kilometraje y horometro. Usa estas columnas:
 
-`ITEM, FECHA, LUGAR, CHOFER, HOROMETRO ANTERIOR, HOROMETRO ACTUAL, HORAS TRABAJADAS, PLACA, CAMBIO DE ACEITE?, DESCRIPCION`
+`ITEM, FECHA, LUGAR, MAESTRO, TALLER, CHOFER, PLACA, CANTIDAD DE PAGO, DESCRIPCION, KILOMETRAJE INICIAL, KILOMETRAJE FINAL, SUMA KILOMETRAJE, TRANSPORTE, HOROMETRO INICIAL, HOROMETRO FINAL, HORAS, CAMBIO DE ACEITE`
 
-Si `CAMBIO DE ACEITE?` es `NO`, la app acumula las horas por placa. Cuando una placa llega a `250` horas o mas sin cambio de aceite, muestra una alerta con enlaces de WhatsApp para:
+Reglas de alerta:
 
-- `+593 93 906 9555`
-- `+593 99 788 2191`
+- Transporte `GRANDE`: alerta al acumular `10000 km` sin cambio de aceite.
+- Transporte `PEQUENO`: alerta al acumular `5000 km` sin cambio de aceite.
+- Cualquier transporte: alerta al acumular `250 horas` de horometro sin cambio de aceite.
 
-Para envio 100% automatico por WhatsApp se debe conectar una API oficial de WhatsApp Business o Twilio con credenciales del negocio. Una web estatica no puede enviar mensajes automaticos de WhatsApp sin esa autorizacion externa.
-
-Despues de modificar `apps-script/Code.gs`, publica una nueva version del Web App en Apps Script para que Google Sheets reciba tambien los registros de horometro.
+Despues de modificar `apps-script/Code.gs`, publica una nueva version del Web App en Apps Script para que Google Sheets reciba tambien los registros de cambio de aceite actualizados.
 
 ## WhatsApp automatico
 
@@ -67,20 +65,20 @@ El Apps Script ya incluye integracion con Meta WhatsApp Cloud API. Para activarl
 WHATSAPP_PHONE_NUMBER_ID=tu_phone_number_id
 WHATSAPP_ACCESS_TOKEN=tu_access_token
 WHATSAPP_TEMPLATE_NAME=alerta_horometro
-WHATSAPP_LANGUAGE_CODE=es
+WHATSAPP_LANGUAGE_CODE=es_EC
 ```
 
-La plantilla aprobada en Meta debe tener 3 variables:
+La plantilla aprobada en Meta debe tener 3 variables. La segunda variable recibe kilometraje u horas segun la regla disparada:
 
 ```text
-ALERTA PUNTO PAS: La placa {{1}} tiene {{2}} horas acumuladas sin cambio de aceite. Ultimo registro: {{3}}.
+ALERTA PUNTO PAS: La placa {{1}} tiene {{2}} acumulados sin cambio de aceite. Ultimo registro: {{3}}.
 ```
 
-Cuando una placa llegue a 250 horas o mas sin cambio de aceite, Apps Script enviara automaticamente el mensaje a:
+Cuando una placa alcance el limite de kilometraje u horas sin cambio de aceite, Apps Script enviara automaticamente el mensaje a:
 
 - `593939069555`
 
-El script crea una hoja `ALERTAS HOROMETRO` para evitar repetir la misma alerta dentro del mismo bloque de 250 horas.
+El script crea una hoja `ALERTAS ACEITE` para evitar repetir la misma alerta dentro del mismo bloque de kilometraje u horas.
 
 11. Reinicia la app con `npm run dev`.
 

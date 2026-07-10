@@ -3,8 +3,7 @@ const SHEET_GIDS = {
   'Mantenimiento': 0,
   'Lavado': 819388144,
   'Engrasada': 2024356449,
-  'Cambio de aceite': 464443967,
-  'Control horometro': null
+  'Cambio de aceite': 464443967
 };
 
 function doGet() {
@@ -26,32 +25,21 @@ function doPost(e) {
     }
 
     const sheetName = data.tipoServicio;
-    const sheet = sheetName === 'Control horometro' ? getOrCreateHourMeterSheet() : getSheetByGid(SHEET_GIDS[sheetName]);
+    const sheet = getSheetByGid(SHEET_GIDS[sheetName]);
 
     if (!sheet) {
       return jsonResponse({ ok: false, error: 'No existe la hoja: ' + sheetName });
     }
 
     const item = Math.max(sheet.getLastRow(), 1);
-    if (sheetName === 'Control horometro') {
-      sheet.appendRow([
-        item,
-        data.fecha || '',
-        data.lugar || '',
-        data.chofer || '',
-        String(data.placa || '').toUpperCase(),
-        Number(data.horometroAnterior || 0),
-        Number(data.horometroActual || 0),
-        data.descripcion || '',
-        String(data.cambioAceite || 'NO').toUpperCase()
-      ]);
-      processHourMeterAlert(String(data.placa || '').toUpperCase());
-      return jsonResponse({ ok: true });
-    }
     if (sheetName === 'Cambio de aceite') {
+      const placa = String(data.placa || '').toUpperCase();
       const kmInicial = Number(data.kilometrajeInicial || 0);
       const kmFinal = Number(data.kilometrajeFinal || 0);
-      const sumaKm = calculateOilMileageSum(sheet, String(data.placa || '').toUpperCase(), kmInicial, kmFinal);
+      const horometroInicial = Number(data.horometroAnterior || 0);
+      const horometroFinal = Number(data.horometroActual || 0);
+      const horasTrabajadas = Math.max(0, horometroFinal - horometroInicial);
+      const sumaKm = calculateOilMileageSum(sheet, placa, kmInicial, kmFinal, String(data.cambioAceite || 'NO').toUpperCase() === 'SI');
       sheet.appendRow([
         item,
         data.fecha || '',
@@ -59,13 +47,19 @@ function doPost(e) {
         data.maestro || '',
         data.taller || '',
         data.chofer || '',
-        String(data.placa || '').toUpperCase(),
+        placa,
         Number(data.cantidadPago || 0),
         data.descripcion || '',
         kmInicial,
         kmFinal,
-        sumaKm
+        sumaKm,
+        normalizeTransport(data.transporte),
+        horometroInicial,
+        horometroFinal,
+        horasTrabajadas,
+        String(data.cambioAceite || 'NO').toUpperCase() === 'SI' ? 'SI' : 'NO'
       ]);
+      processOilAlert(placa);
       return jsonResponse({ ok: true });
     }
     sheet.appendRow([
@@ -86,73 +80,81 @@ function doPost(e) {
   }
 }
 
-function calculateOilMileageSum(sheet, placa, kmInicial, kmFinal) {
+function normalizeTransport(value) {
+  return String(value || '').toUpperCase().indexOf('PEQUE') !== -1 || String(value || '').toUpperCase() === 'PEQUENO' ? 'PEQUENO' : 'GRANDE';
+}
+
+function calculateOilMileageSum(sheet, placa, kmInicial, kmFinal, changedOil) {
   const values = sheet.getDataRange().getValues();
   let total = 0;
   for (let i = 1; i < values.length; i++) {
     const rowPlate = String(values[i][6] || '').toUpperCase();
     if (rowPlate !== placa) continue;
+    if (String(values[i][16] || '').toUpperCase() === 'SI') {
+      total = 0;
+      continue;
+    }
     const storedSum = Number(values[i][11] || 0);
     if (storedSum > total) total = storedSum;
     if (!storedSum) total += Math.max(0, Number(values[i][10] || 0) - Number(values[i][9] || 0));
   }
-  return total + Math.max(0, Number(kmFinal || 0) - Number(kmInicial || 0));
+  return changedOil ? 0 : total + Math.max(0, Number(kmFinal || 0) - Number(kmInicial || 0));
 }
 
 function configureWhatsApp(data) {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty('WHATSAPP_PHONE_NUMBER_ID', data.phoneNumberId || '');
   properties.setProperty('WHATSAPP_ACCESS_TOKEN', data.accessToken || '');
-  properties.setProperty('WHATSAPP_TEMPLATE_NAME', data.templateName || 'jaspers_market_order_confirmation_v1');
-  properties.setProperty('WHATSAPP_LANGUAGE_CODE', data.languageCode || 'en_US');
+  properties.setProperty('WHATSAPP_TEMPLATE_NAME', data.templateName || 'alerta_horometro');
+  properties.setProperty('WHATSAPP_LANGUAGE_CODE', data.languageCode || 'es_EC');
 }
 
-function getOrCreateHourMeterSheet() {
-  const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
-  let sheet = spreadsheet.getSheetByName('CONTROL HOROMETRO');
-  if (!sheet) {
-    sheet = spreadsheet.insertSheet('CONTROL HOROMETRO');
-    sheet.appendRow(['ITEM', 'FECHA', 'LUGAR', 'CHOFER', 'PLACA', 'HOROMETRO INICIAL', 'HOROMETRO FINAL', 'DESCRIPCION', 'CAMBIO DE ACEITE']);
-  }
-  return sheet;
-}
-
-function processHourMeterAlert(placa) {
+function processOilAlert(placa) {
   if (!placa) return;
 
-  const sheet = getOrCreateHourMeterSheet();
+  const sheet = getSheetByGid(SHEET_GIDS['Cambio de aceite']);
   const values = sheet.getDataRange().getValues();
   let accumulatedHours = 0;
+  let accumulatedKm = 0;
+  let transport = 'GRANDE';
   let lastDate = '';
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    const rowPlate = String(row[4] || '').toUpperCase();
+    const rowPlate = String(row[6] || '').toUpperCase();
     if (rowPlate !== placa) continue;
 
     lastDate = row[1] || lastDate;
-    const changedOil = String(row[8] || '').toUpperCase() === 'SI';
+    transport = normalizeTransport(row[12] || transport);
+    const changedOil = String(row[16] || '').toUpperCase() === 'SI';
     if (changedOil) {
       accumulatedHours = 0;
+      accumulatedKm = 0;
     } else {
-      accumulatedHours += Math.max(0, Number(row[6] || 0) - Number(row[5] || 0));
+      accumulatedKm += Math.max(0, Number(row[10] || 0) - Number(row[9] || 0));
+      accumulatedHours += Number(row[15] || 0) || Math.max(0, Number(row[14] || 0) - Number(row[13] || 0));
     }
   }
 
-  if (accumulatedHours < 250 || wasHourMeterAlertSent(placa, accumulatedHours)) return;
+  const kmLimit = transport === 'PEQUENO' ? 5000 : 10000;
+  const alerts = [];
+  if (accumulatedKm >= kmLimit && !wasOilAlertSent(placa, 'KM', accumulatedKm, kmLimit)) alerts.push({ type: 'KM', value: accumulatedKm, limit: kmLimit, label: accumulatedKm + ' km' });
+  if (accumulatedHours >= 250 && !wasOilAlertSent(placa, 'HORAS', accumulatedHours, 250)) alerts.push({ type: 'HORAS', value: accumulatedHours, limit: 250, label: accumulatedHours + ' horas' });
 
-  const results = sendWhatsAppHourMeterAlert(placa, accumulatedHours, lastDate);
-  results.forEach(function (result) {
-    registerHourMeterAlert(placa, accumulatedHours, lastDate, result.status, result.response);
+  alerts.forEach(function (alert) {
+    const results = sendWhatsAppOilAlert(placa, alert.label, lastDate);
+    results.forEach(function (result) {
+      registerOilAlert(placa, alert.type, alert.value, alert.limit, lastDate, result.status, result.response);
+    });
   });
 }
 
-function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
+function sendWhatsAppOilAlert(placa, value, lastDate) {
   const properties = PropertiesService.getScriptProperties();
   const phoneNumberId = properties.getProperty('WHATSAPP_PHONE_NUMBER_ID');
   const token = properties.getProperty('WHATSAPP_ACCESS_TOKEN');
   const templateName = properties.getProperty('WHATSAPP_TEMPLATE_NAME') || 'alerta_horometro';
-  const languageCode = properties.getProperty('WHATSAPP_LANGUAGE_CODE') || 'es';
+  const languageCode = properties.getProperty('WHATSAPP_LANGUAGE_CODE') || 'es_EC';
   const recipients = ['593939069555'];
 
   if (!phoneNumberId || !token) {
@@ -174,7 +176,7 @@ function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
           type: 'body',
           parameters: [
             { type: 'text', text: placa },
-            { type: 'text', text: String(hours) },
+            { type: 'text', text: String(value) },
             { type: 'text', text: String(lastDate || '') }
           ]
         }]
@@ -203,32 +205,32 @@ function sendWhatsAppHourMeterAlert(placa, hours, lastDate) {
   return results;
 }
 
-function wasHourMeterAlertSent(placa, hours) {
+function wasOilAlertSent(placa, type, value, limit) {
   const sheet = getOrCreateAlertsSheet();
   const values = sheet.getDataRange().getValues();
-  const bucket = Math.floor(Number(hours || 0) / 250);
+  const bucket = Math.floor(Number(value || 0) / Number(limit || 1));
 
   for (let i = 1; i < values.length; i++) {
-    const response = String(values[i][6] || '');
-    if (String(values[i][0]).toUpperCase() === placa && Number(values[i][3]) === bucket && String(values[i][4]).toUpperCase() === 'ENVIADA' && response.indexOf('messages') !== -1) {
+    const response = String(values[i][7] || '');
+    if (String(values[i][0]).toUpperCase() === placa && String(values[i][1]).toUpperCase() === type && Number(values[i][4]) === bucket && String(values[i][5]).toUpperCase() === 'ENVIADA' && response.indexOf('messages') !== -1) {
       return true;
     }
   }
   return false;
 }
 
-function registerHourMeterAlert(placa, hours, lastDate, status, response) {
+function registerOilAlert(placa, type, value, limit, lastDate, status, response) {
   const sheet = getOrCreateAlertsSheet();
-  const bucket = Math.floor(Number(hours || 0) / 250);
-  sheet.appendRow([placa, hours, lastDate, bucket, status || 'ENVIADA', new Date(), response || '']);
+  const bucket = Math.floor(Number(value || 0) / Number(limit || 1));
+  sheet.appendRow([placa, type, value, limit, bucket, status || 'ENVIADA', new Date(), response || '', lastDate]);
 }
 
 function getOrCreateAlertsSheet() {
   const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
-  let sheet = spreadsheet.getSheetByName('ALERTAS HOROMETRO');
+  let sheet = spreadsheet.getSheetByName('ALERTAS ACEITE');
   if (!sheet) {
-    sheet = spreadsheet.insertSheet('ALERTAS HOROMETRO');
-    sheet.appendRow(['PLACA', 'HORAS', 'ULTIMA FECHA', 'BLOQUE 250H', 'ESTADO', 'FECHA ALERTA', 'RESPUESTA META']);
+    sheet = spreadsheet.insertSheet('ALERTAS ACEITE');
+    sheet.appendRow(['PLACA', 'TIPO', 'VALOR', 'LIMITE', 'BLOQUE', 'ESTADO', 'FECHA ALERTA', 'RESPUESTA META', 'ULTIMA FECHA SERVICIO']);
   }
   return sheet;
 }
