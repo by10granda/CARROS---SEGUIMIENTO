@@ -623,6 +623,23 @@ tbody tr:hover { background: rgba(255,0,0,.035); }
 body.night-mode .modal-head { background: rgba(255,255,255,.04); }
 .form-grid { padding: 24px 26px 8px; gap: 16px; }
 .modal .alert, .modal .full, .modal .confirm-box { margin-left: 26px; margin-right: 26px; width: calc(100% - 52px); }
+.modal .full {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -12px 28px rgba(15,23,42,.10);
+}
+.modal .full:after {
+  content: "";
+  position: absolute;
+  left: -26px;
+  right: -26px;
+  bottom: -10px;
+  height: 10px;
+  background: inherit;
+}
 .confirm-box { border-radius: 20px; background: linear-gradient(180deg, #fff7f7, #fff1f1); }
 .icon-btn { border-radius: 14px; }
 
@@ -693,6 +710,7 @@ body.night-mode .service-stats strong { color: #f8fafc; }
   .summary-card { min-height: 118px; }
   .form-grid { padding: 20px; }
   .modal .alert, .modal .full, .modal .confirm-box { margin-left: 20px; margin-right: 20px; width: calc(100% - 40px); }
+  .modal .full:after { left: -20px; right: -20px; }
   tr { border-bottom: 1px solid var(--line); }
   td { font-size: .9rem; }
   td:before { min-width: 120px; text-align: left; }
