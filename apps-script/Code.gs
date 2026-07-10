@@ -33,6 +33,7 @@ function doPost(e) {
 
     const item = Math.max(sheet.getLastRow(), 1);
     if (sheetName === 'Cambio de aceite') {
+      ensureOilAlertColumns(sheet);
       const placa = String(data.placa || '').toUpperCase();
       const kmInicial = Number(data.kilometrajeInicial || 0);
       const kmFinal = Number(data.kilometrajeFinal || 0);
@@ -57,9 +58,14 @@ function doPost(e) {
         horometroInicial,
         horometroFinal,
         horasTrabajadas,
-        String(data.cambioAceite || 'NO').toUpperCase() === 'SI' ? 'SI' : 'NO'
+        String(data.cambioAceite || 'NO').toUpperCase() === 'SI' ? 'SI' : 'NO',
+        '',
+        '',
+        '',
+        ''
       ]);
-      processOilAlert(placa);
+      const alerts = processOilAlert(placa);
+      updateOilAlertFields(sheet, sheet.getLastRow(), alerts);
       return jsonResponse({ ok: true });
     }
     sheet.appendRow([
@@ -78,6 +84,38 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse({ ok: false, error: error.message });
   }
+}
+
+function ensureOilAlertColumns(sheet) {
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 21)).getValues()[0];
+  const expected = {
+    18: 'ALERTA KM',
+    19: 'ALERTA HORAS',
+    20: 'TIPO ALERTA',
+    21: 'ESTADO ALERTA'
+  };
+  Object.keys(expected).forEach(function (column) {
+    const index = Number(column);
+    if (!headers[index - 1]) sheet.getRange(1, index).setValue(expected[column]);
+  });
+}
+
+function updateOilAlertFields(sheet, rowNumber, alerts) {
+  if (!alerts || !alerts.length) {
+    sheet.getRange(rowNumber, 18, 1, 4).setValues([['NO', 'NO', '', 'SIN ALERTA']]);
+    return;
+  }
+
+  const kmAlert = alerts.filter(function (alert) { return alert.type === 'KM'; })[0];
+  const hoursAlert = alerts.filter(function (alert) { return alert.type === 'HORAS'; })[0];
+  const types = alerts.map(function (alert) { return alert.type; }).join(' + ');
+  const statuses = alerts.map(function (alert) { return alert.status; }).join(' | ');
+  sheet.getRange(rowNumber, 18, 1, 4).setValues([[
+    kmAlert ? kmAlert.value : 'NO',
+    hoursAlert ? hoursAlert.value : 'NO',
+    types,
+    statuses || 'ALERTA GENERADA'
+  ]]);
 }
 
 function normalizeTransport(value) {
@@ -110,7 +148,7 @@ function configureWhatsApp(data) {
 }
 
 function processOilAlert(placa) {
-  if (!placa) return;
+  if (!placa) return [];
 
   const sheet = getSheetByGid(SHEET_GIDS['Cambio de aceite']);
   const values = sheet.getDataRange().getValues();
@@ -138,15 +176,18 @@ function processOilAlert(placa) {
 
   const kmLimit = transport === 'PEQUENO' ? 5000 : 10000;
   const alerts = [];
-  if (accumulatedKm >= kmLimit && !wasOilAlertSent(placa, 'KM', accumulatedKm, kmLimit)) alerts.push({ type: 'KM', value: accumulatedKm, limit: kmLimit, label: accumulatedKm + ' km' });
-  if (accumulatedHours >= 250 && !wasOilAlertSent(placa, 'HORAS', accumulatedHours, 250)) alerts.push({ type: 'HORAS', value: accumulatedHours, limit: 250, label: accumulatedHours + ' horas' });
+  if (accumulatedKm >= kmLimit && !wasOilAlertSent(placa, 'KM', accumulatedKm, kmLimit)) alerts.push({ type: 'KM', value: accumulatedKm, limit: kmLimit, km: accumulatedKm, hours: accumulatedHours, label: 'KILOMETRAJE: ' + accumulatedKm + ' km de ' + kmLimit + ' km' });
+  if (accumulatedHours >= 250 && !wasOilAlertSent(placa, 'HORAS', accumulatedHours, 250)) alerts.push({ type: 'HORAS', value: accumulatedHours, limit: 250, km: accumulatedKm, hours: accumulatedHours, label: 'HORAS DE TRABAJO: ' + accumulatedHours + ' horas de 250 horas' });
 
   alerts.forEach(function (alert) {
     const results = sendWhatsAppOilAlert(placa, alert.label, lastDate);
+    alert.status = results.map(function (result) { return result.status; }).join(' | ');
     results.forEach(function (result) {
-      registerOilAlert(placa, alert.type, alert.value, alert.limit, lastDate, result.status, result.response);
+      registerOilAlert(placa, alert.type, alert.value, alert.limit, alert.km, alert.hours, lastDate, result.status, result.response);
     });
   });
+
+  return alerts;
 }
 
 function sendWhatsAppOilAlert(placa, value, lastDate) {
@@ -211,7 +252,7 @@ function wasOilAlertSent(placa, type, value, limit) {
   const bucket = Math.floor(Number(value || 0) / Number(limit || 1));
 
   for (let i = 1; i < values.length; i++) {
-    const response = String(values[i][7] || '');
+    const response = String(values[i][9] || values[i][7] || '');
     if (String(values[i][0]).toUpperCase() === placa && String(values[i][1]).toUpperCase() === type && Number(values[i][4]) === bucket && String(values[i][5]).toUpperCase() === 'ENVIADA' && response.indexOf('messages') !== -1) {
       return true;
     }
@@ -219,10 +260,10 @@ function wasOilAlertSent(placa, type, value, limit) {
   return false;
 }
 
-function registerOilAlert(placa, type, value, limit, lastDate, status, response) {
+function registerOilAlert(placa, type, value, limit, km, hours, lastDate, status, response) {
   const sheet = getOrCreateAlertsSheet();
   const bucket = Math.floor(Number(value || 0) / Number(limit || 1));
-  sheet.appendRow([placa, type, value, limit, bucket, status || 'ENVIADA', new Date(), response || '', lastDate]);
+  sheet.appendRow([placa, type, value, limit, bucket, status || 'ENVIADA', new Date(), km || 0, hours || 0, response || '', lastDate]);
 }
 
 function getOrCreateAlertsSheet() {
@@ -230,7 +271,13 @@ function getOrCreateAlertsSheet() {
   let sheet = spreadsheet.getSheetByName('ALERTAS ACEITE');
   if (!sheet) {
     sheet = spreadsheet.insertSheet('ALERTAS ACEITE');
-    sheet.appendRow(['PLACA', 'TIPO', 'VALOR', 'LIMITE', 'BLOQUE', 'ESTADO', 'FECHA ALERTA', 'RESPUESTA META', 'ULTIMA FECHA SERVICIO']);
+    sheet.appendRow(['PLACA', 'TIPO', 'VALOR', 'LIMITE', 'BLOQUE', 'ESTADO', 'FECHA ALERTA', 'KILOMETRAJE', 'HOROMETRO', 'RESPUESTA META', 'ULTIMA FECHA SERVICIO']);
+  } else {
+    const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 11)).getValues()[0];
+    if (headers[7] !== 'KILOMETRAJE' || headers[8] !== 'HOROMETRO') {
+      sheet.insertColumnsAfter(7, 2);
+      sheet.getRange(1, 8, 1, 2).setValues([['KILOMETRAJE', 'HOROMETRO']]);
+    }
   }
   return sheet;
 }
