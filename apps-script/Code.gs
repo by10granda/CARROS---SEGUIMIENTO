@@ -128,7 +128,10 @@ function updateOilAlertFields(sheet, rowNumber, alerts) {
 }
 
 function normalizeTransport(value) {
-  return String(value || '').toUpperCase().indexOf('PEQUE') !== -1 || String(value || '').toUpperCase() === 'PEQUENO' ? 'PEQUENO' : 'GRANDE';
+  const normalized = String(value || '').toUpperCase();
+  if (normalized.indexOf('PESAD') !== -1) return 'PESADO';
+  if (normalized.indexOf('PEQUE') !== -1 || normalized === 'PEQUENO') return 'PEQUENO';
+  return 'GRANDE';
 }
 
 function calculateOilMileageSum(sheet, placa, kmInicial, kmFinal, changedOil) {
@@ -183,10 +186,11 @@ function processOilAlert(placa) {
     }
   }
 
+  const isHeavy = transport === 'PESADO';
   const kmLimit = transport === 'PEQUENO' ? 5000 : 10000;
   const alerts = [];
-  if (accumulatedKm >= kmLimit && !wasOilAlertSent(placa, 'KM', accumulatedKm, kmLimit)) alerts.push({ type: 'KM', value: accumulatedKm, limit: kmLimit, km: accumulatedKm, hours: accumulatedHours, label: 'KILOMETRAJE: ' + accumulatedKm + ' km de ' + kmLimit + ' km' });
-  if (accumulatedHours >= 250 && !wasOilAlertSent(placa, 'HORAS', accumulatedHours, 250)) alerts.push({ type: 'HORAS', value: accumulatedHours, limit: 250, km: accumulatedKm, hours: accumulatedHours, label: 'HORAS DE TRABAJO: ' + accumulatedHours + ' horas de 250 horas' });
+  if (!isHeavy && accumulatedKm >= kmLimit && !wasOilAlertSent(placa, 'KM', accumulatedKm, kmLimit)) alerts.push({ type: 'KM', value: accumulatedKm, limit: kmLimit, km: accumulatedKm, hours: accumulatedHours, label: 'KILOMETRAJE: ' + accumulatedKm + ' km de ' + kmLimit + ' km' });
+  if (isHeavy && accumulatedHours >= 250 && !wasOilAlertSent(placa, 'HORAS', accumulatedHours, 250)) alerts.push({ type: 'HORAS', value: accumulatedHours, limit: 250, km: accumulatedKm, hours: accumulatedHours, label: 'HORAS DE TRABAJO: ' + accumulatedHours + ' horas de 250 horas' });
 
   alerts.forEach(function (alert) {
     const results = sendWhatsAppOilAlert(placa, alert.label, lastDate);

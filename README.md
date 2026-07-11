@@ -53,7 +53,8 @@ Reglas de alerta:
 
 - Transporte `GRANDE`: alerta al acumular `10000 km` sin cambio de aceite.
 - Transporte `PEQUENO`: alerta al acumular `5000 km` sin cambio de aceite.
-- Cualquier transporte: alerta al acumular `250 horas` de horometro sin cambio de aceite.
+- Transporte `PESADO`: alerta al acumular `250 horas` de horometro sin cambio de aceite.
+- Solo `PESADO` usa horometro para alertas. `GRANDE` y `PEQUENO` alertan solo por kilometraje.
 
 Despues de modificar `apps-script/Code.gs`, publica una nueva version del Web App en Apps Script para que Google Sheets reciba tambien los registros de cambio de aceite actualizados.
 
